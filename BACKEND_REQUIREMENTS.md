@@ -1,772 +1,661 @@
-# Backend Requirements & Implementation Guide
+# Backend Requirements - Nutri-Vision AI v2
 
-## 🏗️ Backend Architecture Overview
+## 📋 Overview
 
-The Nutri-Vision AI backend requires a robust, HIPAA-compliant architecture capable of handling sensitive medical data while providing real-time nutrition analysis and health insights.
+Nutri-Vision AI v2 uses **Supabase** as the primary backend, providing authentication, database, and real-time features out of the box. This document outlines the AI services and additional backend components needed.
 
-## 🔐 Core Backend Services
+## 🗄️ Primary Backend: Supabase
 
-### 1. Authentication & Authorization Service
+### Already Provided by Supabase
+✅ **Authentication**: Email/password with JWT tokens  
+✅ **PostgreSQL Database**: Relational data storage with RLS  
+✅ **Row Level Security**: Built-in access control  
+✅ **Real-time Subscriptions**: WebSocket connections  
+✅ **RESTful API**: Auto-generated from database schema  
+✅ **Storage**: File uploads (for food images)
 
-**Purpose**: Secure user authentication with medical-grade security
-**Technology**: Node.js/Express with JWT + OAuth2
-**Database**: PostgreSQL with encrypted user credentials
+### Supabase Configuration
 
-**Key Functions**:
-\`\`\`javascript
-// User registration with health data consent
-POST /api/auth/register
+**Database Tables** (already created via SQL):
+- `profiles` - User health information
+- `meals` - Food logs with nutrition data
+- `health_alerts` - Medical condition warnings
+- `daily_summaries` - Daily nutrition aggregates
+
+**Row Level Security Policies**:
+```sql
+-- Users can only access their own data
+CREATE POLICY "Users own data" ON profiles
+  FOR ALL USING (auth.uid() = id);
+```
+
+---
+
+## 🤖 Required AI Services
+
+### 1. Food Recognition & Nutrition Analysis API
+
+**Purpose**: Analyze text/image/voice input and return nutrition data
+
+**Endpoint**: `POST /api/ai/analyze-food`
+
+**Request**:
+```json
 {
-  email: string,
-  password: string, // bcrypt hashed
-  healthDataConsent: boolean,
-  privacyConsent: boolean,
-  mfaEnabled: boolean
+  "input_type": "text" | "image" | "voice",
+  "content": "2 eggs and toast" | "base64_image" | "audio_data",
+  "user_id": "uuid",
+  "meal_type": "breakfast" | "lunch" | "dinner" | "snack"
 }
+```
 
-// Secure login with MFA
-POST /api/auth/login
+**Response**:
+```json
 {
-  email: string,
-  password: string,
-  mfaToken?: string
-}
-
-// Health data access token (short-lived)
-POST /api/auth/health-token
-Headers: { Authorization: "Bearer <jwt>" }
-\`\`\`
-
-**Implementation Details**:
-- **Password Security**: bcrypt with salt rounds 12+
-- **JWT Tokens**: Short-lived (15 min) with refresh tokens
-- **MFA Support**: TOTP/SMS for sensitive health data access
-- **Session Management**: Redis-based session store with encryption
-- **Rate Limiting**: Prevent brute force attacks (5 attempts/15 min)
-
-### 2. Health Profile Management Service
-
-**Purpose**: Store and manage comprehensive health profiles
-**Technology**: Node.js with Prisma ORM
-**Database**: PostgreSQL with field-level encryption
-
-**Key Functions**:
-\`\`\`javascript
-// Create/Update health profile
-PUT /api/health/profile
-{
-  demographics: {
-    age: number,
-    gender: string,
-    activityLevel: string,
-    height: number,
-    weight: number
+  "meal_name": "Scrambled Eggs with Toast",
+  "food_items": [
+    {
+      "name": "Scrambled Eggs",
+      "quantity": "2",
+      "unit": "eggs"
+    },
+    {
+      "name": "Whole Wheat Toast",
+      "quantity": "2",
+      "unit": "slices"
+    }
+  ],
+  "nutrition": {
+    "calories": 320,
+    "protein": 18,
+    "carbs": 28,
+    "fat": 14,
+    "sodium": 450,
+    "fiber": 4
   },
-  medicalConditions: [
+  "confidence": 0.92
+}
+```
+
+**Implementation Options**:
+
+**Option A: OpenAI GPT-4 Vision (Recommended for MVP)**
+```javascript
+// Use GPT-4 for text and vision analysis
+import OpenAI from 'openai'
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+})
+
+async function analyzeFoodText(description) {
+  const response = await openai.chat.completions.create({
+    model: "gpt-4",
+    messages: [
+      {
+        role: "system",
+        content: "You are a nutrition expert. Analyze food descriptions and return detailed nutrition data in JSON format."
+      },
+      {
+        role: "user",
+        content: `Analyze this meal and return calories, protein, carbs, fat, sodium: "${description}"`
+      }
+    ],
+    response_format: { type: "json_object" }
+  })
+  
+  return JSON.parse(response.choices[0].message.content)
+}
+```
+
+**Option B: Custom ML Model**
+- Train on USDA Food Database
+- Deploy with TensorFlow Serving
+- Use YOLOv8 for image recognition
+- Estimated cost: $500-1000/month for hosting
+
+**Option C: Third-Party APIs**
+- Nutritionix API ($100/month for 10k requests)
+- Edamam Food Database API (Free tier available)
+- Spoonacular API ($150/month)
+
+**Recommended**: OpenAI GPT-4 for MVP, then migrate to custom model if needed
+
+---
+
+### 2. Medical Condition Alert Service
+
+**Purpose**: Check logged food against user's medical conditions and generate alerts
+
+**Endpoint**: `POST /api/ai/check-health-alerts`
+
+**Request**:
+```json
+{
+  "user_id": "uuid",
+  "meal_data": {
+    "calories": 320,
+    "protein": 18,
+    "carbs": 65,
+    "fat": 14,
+    "sodium": 850
+  },
+  "medical_conditions": ["Type 2 Diabetes", "Hypertension"],
+  "allergies": ["Dairy", "Tree Nuts"]
+}
+```
+
+**Response**:
+```json
+{
+  "alerts": [
     {
-      condition: string,
-      severity: "mild" | "moderate" | "severe",
-      diagnosedDate: Date,
-      medications: string[],
-      restrictions: string[]
+      "type": "sodium",
+      "severity": "warning",
+      "message": "High sodium detected: 850mg in this meal. Daily limit for hypertension is 1500mg.",
+      "recommendation": "Consider low-sodium alternatives"
+    },
+    {
+      "type": "carbs",
+      "severity": "info",
+      "message": "65g carbs detected. Monitor blood sugar (Diabetes).",
+      "recommendation": "Check blood glucose 2 hours after meal"
     }
   ],
-  allergies: [
-    {
-      allergen: string,
-      severity: "mild" | "moderate" | "severe",
-      reaction: string,
-      emergencyProtocol: string
-    }
-  ],
-  emergencyContact: {
-    name: string,
-    relationship: string,
-    phone: string,
-    medicalPowerOfAttorney: boolean
+  "is_safe": true
+}
+```
+
+**Implementation**:
+```javascript
+// Simple rule-based system (can be enhanced with AI)
+const HEALTH_RULES = {
+  'Type 2 Diabetes': {
+    carbs: { max_per_meal: 60, max_daily: 150, unit: 'g' }
+  },
+  'Hypertension': {
+    sodium: { max_per_meal: 500, max_daily: 1500, unit: 'mg' }
+  },
+  'High Cholesterol': {
+    saturated_fat: { max_per_meal: 20, max_daily: 50, unit: 'g' }
+  },
+  'Kidney Disease': {
+    protein: { max_per_meal: 25, max_daily: 80, unit: 'g' }
   }
 }
 
-// Get health profile with privacy controls
-GET /api/health/profile?include=demographics,conditions,allergies
-\`\`\`
-
-**Implementation Details**:
-- **Field Encryption**: AES-256 encryption for all PII/PHI
-- **Access Logging**: Audit trail for all health data access
-- **Data Validation**: Medical condition validation against ICD-10 codes
-- **Privacy Controls**: Granular permissions for data sharing
-- **Backup Strategy**: Encrypted backups with 7-year retention
-
-### 3. Food Recognition & Analysis Service
-
-**Purpose**: Multi-modal food identification and nutritional analysis
-**Technology**: Python/FastAPI with ML models
-**Database**: MongoDB for food database, Redis for caching
-
-**Key Functions**:
-\`\`\`python
-# Text-based food logging
-POST /api/food/analyze-text
-{
-  "description": "grilled chicken breast with steamed broccoli",
-  "portion_size": "1 cup",
-  "meal_type": "lunch",
-  "user_id": "encrypted_user_id"
+function checkHealthAlerts(mealData, conditions) {
+  const alerts = []
+  
+  conditions.forEach(condition => {
+    const rules = HEALTH_RULES[condition]
+    if (!rules) return
+    
+    Object.entries(rules).forEach(([nutrient, limits]) => {
+      if (mealData[nutrient] > limits.max_per_meal) {
+        alerts.push({
+          type: nutrient,
+          severity: mealData[nutrient] > limits.max_per_meal * 1.5 ? 'danger' : 'warning',
+          message: `High ${nutrient} detected: ${mealData[nutrient]}${limits.unit} in this meal.`,
+          recommendation: `Limit for ${condition} is ${limits.max_per_meal}${limits.unit} per meal.`
+        })
+      }
+    })
+  })
+  
+  return { alerts, is_safe: alerts.filter(a => a.severity === 'danger').length === 0 }
 }
+```
 
-# Image-based food recognition
-POST /api/food/analyze-image
-Content-Type: multipart/form-data
+---
+
+### 3. AI Nutrition Recommendations Service
+
+**Purpose**: Generate personalized meal suggestions and nutrition insights
+
+**Endpoint**: `POST /api/ai/recommendations`
+
+**Request**:
+```json
 {
-  "image": File,
-  "user_id": "encrypted_user_id",
-  "meal_context": "dinner"
+  "user_id": "uuid",
+  "current_nutrition": {
+    "calories": 1200,
+    "protein": 45,
+    "carbs": 150,
+    "fat": 40
+  },
+  "goals": {
+    "daily_calories": 2000,
+    "daily_protein": 150,
+    "daily_carbs": 250,
+    "daily_fat": 65
+  },
+  "medical_conditions": ["Type 2 Diabetes"],
+  "dietary_restrictions": ["Vegetarian"],
+  "meal_type": "dinner"
 }
+```
 
-# Voice-to-text food logging
-POST /api/food/analyze-voice
+**Response**:
+```json
 {
-  "audio_data": "base64_encoded_audio",
-  "user_id": "encrypted_user_id",
-  "language": "en-US"
-}
-\`\`\`
-
-**Implementation Details**:
-- **ML Models**: 
-  - YOLOv8 for food object detection
-  - ResNet50 for food classification
-  - Portion estimation using depth analysis
-- **Nutrition Database**: USDA FoodData Central integration
-- **Voice Processing**: Google Speech-to-Text API with medical vocabulary
-- **Caching Strategy**: Redis for frequently accessed nutrition data
-- **Accuracy Validation**: 95%+ accuracy for common foods
-
-### 4. Medical Interaction & Safety Service
-
-**Purpose**: Real-time medication interaction and allergen checking
-**Technology**: Node.js with medical databases
-**Database**: PostgreSQL with medical interaction rules
-
-**Key Functions**:
-\`\`\`javascript
-// Check food-drug interactions
-POST /api/medical/interaction-check
-{
-  foodItems: [
+  "insights": [
     {
-      name: "grapefruit",
-      quantity: "1 medium",
-      nutrients: { vitamin_c: 65, potassium: 237 }
+      "type": "nutrition_gap",
+      "message": "You're 105g short on protein today. Try Greek yogurt or chickpeas.",
+      "priority": "high"
+    },
+    {
+      "type": "goal_progress",
+      "message": "Great job staying within your carb goals! (Diabetes-friendly)",
+      "priority": "info"
     }
   ],
-  medications: [
+  "meal_suggestions": [
     {
-      name: "atorvastatin",
-      dosage: "20mg",
-      timing: "evening"
-    }
-  ],
-  userId: "encrypted_user_id"
-}
-
-// Allergen detection in food
-POST /api/medical/allergen-check
-{
-  foodItems: ["salmon", "almonds", "wheat flour"],
-  userAllergies: [
+      "meal_name": "Grilled Tofu with Quinoa and Roasted Vegetables",
+      "calories": 450,
+      "protein": 35,
+      "reason": "High protein, diabetes-friendly, vegetarian",
+      "ingredients": ["firm tofu", "quinoa", "bell peppers", "zucchini"]
+    },
     {
-      allergen: "tree nuts",
-      severity: "severe",
-      crossReactivity: ["almonds", "walnuts", "pecans"]
+      "meal_name": "Lentil Curry with Brown Rice",
+      "calories": 400,
+      "protein": 28,
+      "reason": "Plant-based protein, low GI for blood sugar control",
+      "ingredients": ["red lentils", "brown rice", "spinach", "tomatoes"]
     }
   ]
 }
+```
 
-// Emergency medical information
-GET /api/medical/emergency-info/:userId
-Headers: { "Emergency-Access-Token": "emergency_token" }
-\`\`\`
+**Implementation with OpenAI**:
+```javascript
+async function generateRecommendations(userData) {
+  const prompt = `
+You are a nutrition AI assistant. Based on this user's data:
+- Current intake: ${JSON.stringify(userData.current_nutrition)}
+- Daily goals: ${JSON.stringify(userData.goals)}
+- Medical conditions: ${userData.medical_conditions.join(', ')}
+- Dietary restrictions: ${userData.dietary_restrictions.join(', ')}
 
-**Implementation Details**:
-- **Drug Database**: FDA Orange Book + custom interaction rules
-- **Allergen Database**: Comprehensive allergen cross-reactivity matrix
-- **Real-time Alerts**: WebSocket connections for immediate warnings
-- **Emergency Access**: Special tokens for first responders
-- **Medical Validation**: Licensed pharmacist review of interaction rules
+Generate:
+1. Nutrition insights (what they're missing, what they're doing well)
+2. 3 meal suggestions for ${userData.meal_type} that fit their needs
 
-### 5. AI Insights & Recommendation Engine
+Return as JSON with 'insights' and 'meal_suggestions' arrays.
+`
 
-**Purpose**: Personalized health insights and meal recommendations
-**Technology**: Python/TensorFlow with custom ML models
-**Database**: ClickHouse for analytics, PostgreSQL for user data
-
-**Key Functions**:
-\`\`\`python
-# Generate personalized meal recommendations
-POST /api/ai/meal-recommendations
-{
-  "user_health_profile": {
-    "conditions": ["type2_diabetes", "hypertension"],
-    "goals": ["weight_loss", "blood_sugar_control"],
-    "preferences": ["mediterranean", "low_sodium"],
-    "restrictions": ["gluten_free"]
-  },
-  "current_nutrition": {
-    "daily_calories": 1450,
-    "daily_sodium": 1800,
-    "daily_carbs": 180
-  },
-  "meal_type": "dinner",
-  "time_of_day": "18:00"
-}
-
-# Analyze nutrition patterns and health trends
-POST /api/ai/health-analysis
-{
-  "user_id": "encrypted_user_id",
-  "time_period": "30_days",
-  "analysis_type": ["blood_sugar_correlation", "symptom_patterns", "nutrient_deficiency_risk"]
-}
-
-# Predictive health risk assessment
-POST /api/ai/risk-assessment
-{
-  "user_id": "encrypted_user_id",
-  "risk_factors": ["family_history", "current_nutrition", "lifestyle"],
-  "prediction_horizon": "6_months"
-}
-\`\`\`
-
-**Implementation Details**:
-- **ML Models**:
-  - Collaborative filtering for meal recommendations
-  - Time series analysis for health trend prediction
-  - Classification models for symptom correlation
-- **Training Data**: Anonymized nutrition and health outcome data
-- **Model Updates**: Weekly retraining with new user data
-- **Explainable AI**: Provide reasoning for all recommendations
-- **A/B Testing**: Continuous model performance optimization
-
-### 6. Healthcare Integration Service
-
-**Purpose**: Integration with healthcare providers and EHR systems
-**Technology**: Node.js with FHIR R4 compliance
-**Database**: PostgreSQL with HL7 message queuing
-
-**Key Functions**:
-\`\`\`javascript
-// Share nutrition data with healthcare provider
-POST /api/healthcare/share-data
-{
-  providerId: "npi_1234567890",
-  patientId: "encrypted_patient_id",
-  dataTypes: ["nutrition_summary", "medication_adherence", "health_goals"],
-  timeRange: {
-    start: "2024-01-01",
-    end: "2024-03-31"
-  },
-  consentToken: "patient_consent_token"
-}
-
-// Receive lab results from healthcare provider
-POST /api/healthcare/lab-results
-{
-  patientId: "encrypted_patient_id",
-  providerId: "npi_1234567890",
-  labResults: [
-    {
-      test: "HbA1c",
-      value: 6.8,
-      unit: "%",
-      referenceRange: "4.0-5.6",
-      date: "2024-01-15"
-    }
-  ],
-  fhirBundle: "base64_encoded_fhir_bundle"
-}
-
-// Generate clinical nutrition report
-GET /api/healthcare/clinical-report/:patientId
-Query: {
-  format: "pdf" | "fhir" | "hl7",
-  period: "30_days",
-  include: "recommendations,trends,alerts"
-}
-\`\`\`
-
-**Implementation Details**:
-- **FHIR Compliance**: Full FHIR R4 implementation for interoperability
-- **HL7 Integration**: Support for HL7 v2.x and v3 messaging
-- **Provider Authentication**: OAuth2 with healthcare provider credentials
-- **Data Mapping**: Automatic conversion between nutrition data and clinical formats
-- **Audit Compliance**: Complete audit trail for all healthcare data sharing
-
-### 7. Real-time Notification Service
-
-**Purpose**: Critical health alerts and medication reminders
-**Technology**: Node.js with WebSocket and push notification services
-**Database**: Redis for real-time data, PostgreSQL for notification history
-
-**Key Functions**:
-\`\`\`javascript
-// Send critical health alert
-POST /api/notifications/critical-alert
-{
-  userId: "encrypted_user_id",
-  alertType: "allergen_detected" | "drug_interaction" | "emergency",
-  severity: "low" | "medium" | "high" | "critical",
-  message: "Severe allergen detected in logged food",
-  actionRequired: true,
-  emergencyContacts: ["contact_id_1", "contact_id_2"]
-}
-
-// Schedule medication reminder
-POST /api/notifications/medication-reminder
-{
-  userId: "encrypted_user_id",
-  medicationName: "Metformin",
-  dosage: "500mg",
-  scheduledTime: "2024-01-15T08:00:00Z",
-  mealTiming: "with_breakfast",
-  reminderTypes: ["push", "sms", "email"]
-}
-
-// WebSocket connection for real-time alerts
-WS /api/notifications/realtime/:userId
-\`\`\`
-
-**Implementation Details**:
-- **Push Notifications**: Firebase Cloud Messaging for mobile apps
-- **SMS Alerts**: Twilio integration for critical health alerts
-- **Email Notifications**: SendGrid with medical-grade templates
-- **WebSocket Management**: Socket.io with authentication and encryption
-- **Delivery Confirmation**: Track and retry failed critical notifications
-
-### 8. Data Analytics & Reporting Service
-
-**Purpose**: Generate health insights and compliance reports
-**Technology**: Python/Pandas with Apache Spark for big data
-**Database**: ClickHouse for analytics, PostgreSQL for metadata
-
-**Key Functions**:
-\`\`\`python
-# Generate user health dashboard data
-GET /api/analytics/dashboard/:userId
-Query: {
-  period: "7_days" | "30_days" | "90_days",
-  metrics: ["nutrition_trends", "health_goals", "medication_adherence"],
-  format: "json" | "csv"
-}
-
-# Population health analytics (anonymized)
-POST /api/analytics/population-health
-{
-  "cohort_criteria": {
-    "age_range": [25, 65],
-    "conditions": ["diabetes", "hypertension"],
-    "time_period": "2023-01-01_to_2023-12-31"
-  },
-  "analysis_type": "nutrition_outcomes",
-  "privacy_level": "k_anonymity_5"
-}
-
-# Compliance and audit reports
-GET /api/analytics/compliance-report
-Query: {
-  report_type: "hipaa_audit" | "data_access" | "security_events",
-  date_range: "2024-01-01_to_2024-01-31",
-  format: "pdf" | "json"
-}
-\`\`\`
-
-**Implementation Details**:
-- **Data Pipeline**: Apache Kafka for real-time data streaming
-- **Analytics Engine**: Apache Spark for large-scale data processing
-- **Privacy Protection**: Differential privacy for population analytics
-- **Report Generation**: Automated PDF generation with medical formatting
-- **Performance Optimization**: Materialized views for common queries
-
-## 🗄️ Database Architecture
-
-### Primary Database (PostgreSQL)
-\`\`\`sql
--- Users table with encryption
-CREATE TABLE users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email VARCHAR(255) UNIQUE NOT NULL,
-  password_hash VARCHAR(255) NOT NULL,
-  encrypted_pii TEXT, -- AES-256 encrypted personal data
-  created_at TIMESTAMP DEFAULT NOW(),
-  last_login TIMESTAMP,
-  mfa_enabled BOOLEAN DEFAULT FALSE,
-  health_data_consent BOOLEAN DEFAULT FALSE,
-  privacy_settings JSONB
-);
-
--- Health profiles with field-level encryption
-CREATE TABLE health_profiles (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  encrypted_demographics TEXT, -- Age, gender, etc.
-  encrypted_medical_conditions TEXT, -- Medical conditions array
-  encrypted_allergies TEXT, -- Allergy information
-  encrypted_medications TEXT, -- Current medications
-  encrypted_emergency_contact TEXT, -- Emergency contact info
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
-);
-
--- Food logs with nutrition data
-CREATE TABLE food_logs (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  food_items JSONB NOT NULL, -- Array of food items with nutrition
-  meal_type VARCHAR(50), -- breakfast, lunch, dinner, snack
-  logged_at TIMESTAMP DEFAULT NOW(),
-  source_type VARCHAR(20), -- text, image, voice, barcode
-  confidence_score DECIMAL(3,2), -- AI confidence in recognition
-  verified BOOLEAN DEFAULT FALSE -- User verification of accuracy
-);
-
--- Medical interactions and alerts
-CREATE TABLE medical_alerts (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  alert_type VARCHAR(50) NOT NULL, -- drug_interaction, allergen, etc.
-  severity VARCHAR(20) NOT NULL, -- low, medium, high, critical
-  message TEXT NOT NULL,
-  triggered_by JSONB, -- What triggered the alert
-  acknowledged BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-\`\`\`
-
-### Analytics Database (ClickHouse)
-\`\`\`sql
--- Nutrition analytics table
-CREATE TABLE nutrition_analytics (
-  user_id String,
-  date Date,
-  meal_type String,
-  calories Float64,
-  protein Float64,
-  carbs Float64,
-  fat Float64,
-  sodium Float64,
-  fiber Float64,
-  sugar Float64,
-  health_conditions Array(String),
-  medication_interactions UInt8,
-  allergen_alerts UInt8
-) ENGINE = MergeTree()
-ORDER BY (user_id, date);
-
--- Health outcomes tracking
-CREATE TABLE health_outcomes (
-  user_id String,
-  date Date,
-  health_score Float64,
-  goal_adherence Float64,
-  symptom_severity Float64,
-  medication_adherence Float64,
-  lab_values Map(String, Float64)
-) ENGINE = MergeTree()
-ORDER BY (user_id, date);
-\`\`\`
-
-### Cache Layer (Redis)
-\`\`\`javascript
-// User session cache
-SET user:session:{userId} {
-  "healthToken": "encrypted_token",
-  "permissions": ["read_profile", "write_food_log"],
-  "lastActivity": "2024-01-15T10:30:00Z",
-  "mfaVerified": true
-} EX 900 // 15 minutes
-
-// Nutrition data cache
-SET nutrition:food:{foodId} {
-  "name": "Grilled Chicken Breast",
-  "calories_per_100g": 165,
-  "protein_per_100g": 31,
-  "allergens": ["none"],
-  "last_updated": "2024-01-15"
-} EX 86400 // 24 hours
-
-// Real-time alerts queue
-LPUSH alerts:critical:{userId} {
-  "type": "allergen_detected",
-  "severity": "high",
-  "message": "Tree nuts detected in logged meal",
-  "timestamp": "2024-01-15T12:00:00Z"
-}
-\`\`\`
-
-## 🔒 Security Implementation
-
-### Encryption Strategy
-\`\`\`javascript
-// Field-level encryption for health data
-const crypto = require('crypto');
-
-class HealthDataEncryption {
-  constructor(encryptionKey) {
-    this.algorithm = 'aes-256-gcm';
-    this.key = Buffer.from(encryptionKey, 'hex');
-  }
-
-  encrypt(data) {
-    const iv = crypto.randomBytes(16);
-    const cipher = crypto.createCipher(this.algorithm, this.key, iv);
-    
-    let encrypted = cipher.update(JSON.stringify(data), 'utf8', 'hex');
-    encrypted += cipher.final('hex');
-    
-    const authTag = cipher.getAuthTag();
-    
-    return {
-      encrypted,
-      iv: iv.toString('hex'),
-      authTag: authTag.toString('hex')
-    };
-  }
-
-  decrypt(encryptedData) {
-    const decipher = crypto.createDecipher(
-      this.algorithm, 
-      this.key, 
-      Buffer.from(encryptedData.iv, 'hex')
-    );
-    
-    decipher.setAuthTag(Buffer.from(encryptedData.authTag, 'hex'));
-    
-    let decrypted = decipher.update(encryptedData.encrypted, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-    
-    return JSON.parse(decrypted);
-  }
-}
-\`\`\`
-
-### API Security Middleware
-\`\`\`javascript
-// HIPAA-compliant request logging
-const auditLogger = (req, res, next) => {
-  const auditLog = {
-    userId: req.user?.id,
-    action: `${req.method} ${req.path}`,
-    ipAddress: req.ip,
-    userAgent: req.get('User-Agent'),
-    timestamp: new Date().toISOString(),
-    dataAccessed: req.path.includes('/health/') ? 'PHI' : 'non-PHI'
-  };
+  const response = await openai.chat.completions.create({
+    model: "gpt-4",
+    messages: [
+      { role: "system", content: "You are a certified nutritionist and health coach." },
+      { role: "user", content: prompt }
+    ],
+    response_format: { type: "json_object" }
+  })
   
-  // Log to secure audit database
-  auditDatabase.log(auditLog);
-  next();
-};
+  return JSON.parse(response.choices[0].message.content)
+}
+```
 
-// Rate limiting for health endpoints
-const healthRateLimit = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-  message: 'Too many health data requests',
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-\`\`\`
+---
+
+### 4. Voice-to-Text Service
+
+**Purpose**: Convert voice recordings to text for food logging
+
+**Endpoint**: `POST /api/ai/voice-to-text`
+
+**Request**:
+```json
+{
+  "audio_data": "base64_encoded_audio",
+  "language": "en-US"
+}
+```
+
+**Response**:
+```json
+{
+  "text": "I had two eggs and toast for breakfast",
+  "confidence": 0.95
+}
+```
+
+**Implementation Options**:
+
+**Option A: Web Speech API (Frontend - Already Working)**
+```javascript
+// No backend needed - runs in browser
+const recognition = new webkitSpeechRecognition()
+recognition.lang = 'en-US'
+recognition.onresult = (event) => {
+  const text = event.results[0][0].transcript
+  // Send text to food analysis API
+}
+```
+
+**Option B: Google Cloud Speech-to-Text (Backend)**
+```javascript
+const speech = require('@google-cloud/speech')
+const client = new speech.SpeechClient()
+
+async function transcribeAudio(audioBase64) {
+  const request = {
+    audio: { content: audioBase64 },
+    config: {
+      encoding: 'LINEAR16',
+      languageCode: 'en-US',
+    },
+  }
+  
+  const [response] = await client.recognize(request)
+  return response.results[0].alternatives[0].transcript
+}
+```
+
+**Recommended**: Use Web Speech API (free, already implemented)
+
+---
 
 ## 🚀 Deployment Architecture
 
-### Microservices Deployment
-\`\`\`yaml
-# docker-compose.yml for development
-version: '3.8'
-services:
-  auth-service:
-    build: ./services/auth
-    environment:
-      - DATABASE_URL=${AUTH_DATABASE_URL}
-      - JWT_SECRET=${JWT_SECRET}
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
-    ports:
-      - "3001:3000"
-    
-  health-service:
-    build: ./services/health
-    environment:
-      - DATABASE_URL=${HEALTH_DATABASE_URL}
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
-    ports:
-      - "3002:3000"
-    
-  food-analysis-service:
-    build: ./services/food-analysis
-    environment:
-      - ML_MODEL_PATH=/models
-      - NUTRITION_API_KEY=${NUTRITION_API_KEY}
-    ports:
-      - "3003:3000"
-    volumes:
-      - ./models:/models
-    
-  medical-service:
-    build: ./services/medical
-    environment:
-      - DRUG_DATABASE_URL=${DRUG_DATABASE_URL}
-      - FDA_API_KEY=${FDA_API_KEY}
-    ports:
-      - "3004:3000"
-    
-  ai-insights-service:
-    build: ./services/ai-insights
-    environment:
-      - TENSORFLOW_MODEL_PATH=/ai-models
-      - ANALYTICS_DATABASE_URL=${ANALYTICS_DATABASE_URL}
-    ports:
-      - "3005:3000"
-    volumes:
-      - ./ai-models:/ai-models
-    
-  notification-service:
-    build: ./services/notifications
-    environment:
-      - FIREBASE_KEY=${FIREBASE_KEY}
-      - TWILIO_SID=${TWILIO_SID}
-      - SENDGRID_API_KEY=${SENDGRID_API_KEY}
-    ports:
-      - "3006:3000"
-    
-  api-gateway:
-    build: ./gateway
-    environment:
-      - AUTH_SERVICE_URL=http://auth-service:3000
-      - HEALTH_SERVICE_URL=http://health-service:3000
-      - FOOD_SERVICE_URL=http://food-analysis-service:3000
-      - MEDICAL_SERVICE_URL=http://medical-service:3000
-      - AI_SERVICE_URL=http://ai-insights-service:3000
-      - NOTIFICATION_SERVICE_URL=http://notification-service:3000
-    ports:
-      - "8080:8080"
-    depends_on:
-      - auth-service
-      - health-service
-      - food-analysis-service
-      - medical-service
-      - ai-insights-service
-      - notification-service
-\`\`\`
+### Recommended Setup
 
-### Production Infrastructure (AWS)
-\`\`\`yaml
-# kubernetes/production.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: nutri-vision-backend
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: nutri-vision-backend
-  template:
-    metadata:
-      labels:
-        app: nutri-vision-backend
-    spec:
-      containers:
-      - name: api-gateway
-        image: nutri-vision/api-gateway:latest
-        ports:
-        - containerPort: 8080
-        env:
-        - name: DATABASE_URL
-          valueFrom:
-            secretKeyRef:
-              name: database-secret
-              key: url
-        - name: ENCRYPTION_KEY
-          valueFrom:
-            secretKeyRef:
-              name: encryption-secret
-              key: key
-        resources:
-          requests:
-            memory: "512Mi"
-            cpu: "250m"
-          limits:
-            memory: "1Gi"
-            cpu: "500m"
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 8080
-          initialDelaySeconds: 30
-          periodSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /ready
-            port: 8080
-          initialDelaySeconds: 5
-          periodSeconds: 5
-\`\`\`
+```
+Frontend (Vercel)
+     ↓
+Supabase (Database + Auth)
+     ↓
+AI Services (Serverless Functions)
+     ↓
+External APIs (OpenAI, Nutritionix)
+```
 
-## 📊 Monitoring & Observability
+### Option 1: Serverless Functions (Recommended for MVP)
 
-### Health Monitoring
-\`\`\`javascript
-// Health check endpoints
-app.get('/health', (req, res) => {
-  const healthCheck = {
-    uptime: process.uptime(),
-    message: 'OK',
-    timestamp: Date.now(),
-    services: {
-      database: checkDatabaseConnection(),
-      redis: checkRedisConnection(),
-      externalAPIs: checkExternalAPIs()
-    }
-  };
+**Deploy AI services as Next.js API routes**
+
+```javascript
+// app/api/ai/analyze-food/route.ts
+import { NextResponse } from 'next/server'
+import { supabase } from '@/lib/supabase'
+import OpenAI from 'openai'
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+})
+
+export async function POST(request: Request) {
+  const { input_type, content, user_id } = await request.json()
   
-  res.status(200).json(healthCheck);
-});
-
-// Medical-specific monitoring
-app.get('/health/medical', async (req, res) => {
-  const medicalHealth = {
-    drugInteractionAPI: await checkDrugAPI(),
-    nutritionDatabase: await checkNutritionDB(),
-    allergenDatabase: await checkAllergenDB(),
-    emergencyAlerts: await checkAlertSystem(),
-    encryptionService: await checkEncryption()
-  };
+  // Call OpenAI API
+  const nutrition = await analyzeFoodWithAI(content)
   
-  res.status(200).json(medicalHealth);
-});
-\`\`\`
+  // Save to Supabase
+  const { data, error } = await supabase
+    .from('meals')
+    .insert({
+      user_id,
+      raw_input: content,
+      input_method: input_type,
+      ...nutrition
+    })
+  
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+  
+  return NextResponse.json(nutrition)
+}
 
-### Performance Metrics
-\`\`\`javascript
-// Custom metrics for medical features
-const prometheus = require('prom-client');
+async function analyzeFoodWithAI(description: string) {
+  const response = await openai.chat.completions.create({
+    model: "gpt-4",
+    messages: [
+      {
+        role: "system",
+        content: "You are a nutrition expert. Return JSON with: meal_name, food_items array, and nutrition object (calories, protein, carbs, fat, sodium)."
+      },
+      {
+        role: "user",
+        content: `Analyze: "${description}"`
+      }
+    ],
+    response_format: { type: "json_object" }
+  })
+  
+  return JSON.parse(response.choices[0].message.content)
+}
+```
 
-const criticalAlertLatency = new prometheus.Histogram({
-  name: 'critical_alert_latency_seconds',
-  help: 'Time to deliver critical health alerts',
-  buckets: [0.1, 0.5, 1, 2, 5]
-});
+**Pros**: Easy deployment, scales automatically, pay per use  
+**Cons**: Cold starts, 10-second timeout on free tier
 
-const allergenDetectionAccuracy = new prometheus.Gauge({
-  name: 'allergen_detection_accuracy',
-  help: 'Accuracy rate of allergen detection',
-});
+---
 
-const medicationInteractionChecks = new prometheus.Counter({
-  name: 'medication_interaction_checks_total',
-  help: 'Total number of medication interaction checks performed'
-});
-\`\`\`
+### Option 2: Dedicated Backend Server
 
-This comprehensive backend architecture ensures medical-grade security, real-time health monitoring, and scalable performance while maintaining HIPAA compliance and user privacy protection.
+**Node.js/Express server hosted separately**
+
+```javascript
+// server.js
+const express = require('express')
+const app = express()
+
+app.post('/api/ai/analyze-food', async (req, res) => {
+  // Food analysis logic
+})
+
+app.post('/api/ai/check-health-alerts', async (req, res) => {
+  // Health alerts logic
+})
+
+app.post('/api/ai/recommendations', async (req, res) => {
+  // Recommendations logic
+})
+
+app.listen(3001, () => console.log('AI Backend running on 3001'))
+```
+
+**Deployment**: Railway, Render, DigitalOcean ($5-10/month)  
+**Pros**: More control, no timeouts, can cache models  
+**Cons**: Need to manage scaling, more expensive
+
+---
+
+## 💰 Cost Estimate (Monthly)
+
+### Minimal MVP
+- **Supabase**: $0 (Free tier: 500MB database, 50k auth users)
+- **OpenAI API**: $20-50 (GPT-4: ~$0.03 per food analysis)
+- **Vercel Hosting**: $0 (Free tier)
+- **Total**: ~$20-50/month
+
+### Production (1000 active users, ~10 meals/day each)
+- **Supabase**: $25 (Pro plan)
+- **OpenAI API**: $200-500 (10k requests/day at $0.03 each)
+- **Vercel Pro**: $20 (for serverless functions)
+- **Storage**: $10 (food images)
+- **Total**: ~$255-555/month
+
+---
+
+## 🔧 Development Setup
+
+### 1. Set up Supabase
+Already complete ✅
+
+### 2. Create AI Service API Routes
+
+Create these files:
+
+```
+app/
+├── api/
+│   ├── ai/
+│   │   ├── analyze-food/
+│   │   │   └── route.ts
+│   │   ├── check-health/
+│   │   │   └── route.ts
+│   │   └── recommendations/
+│   │       └── route.ts
+```
+
+### 3. Environment Variables
+
+Add to `.env.local`:
+```env
+# Supabase (already have)
+NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=xxx
+
+# AI Services (add these)
+OPENAI_API_KEY=sk-xxx
+NUTRITIONIX_API_KEY=xxx (optional)
+GOOGLE_SPEECH_API_KEY=xxx (optional)
+```
+
+### 4. Test APIs
+
+```bash
+# Test food analysis
+curl -X POST http://localhost:3000/api/ai/analyze-food \
+  -H "Content-Type: application/json" \
+  -d '{"input_type":"text","content":"2 eggs and toast","user_id":"xxx"}'
+```
+
+---
+
+## 📊 Database Triggers (Supabase)
+
+### Auto-update Daily Summaries
+
+```sql
+-- Trigger to update daily_summaries when meal is logged
+CREATE OR REPLACE FUNCTION update_daily_summary()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO daily_summaries (user_id, date, total_calories, total_protein, total_carbs, total_fat, meals_logged)
+  VALUES (
+    NEW.user_id,
+    DATE(NEW.meal_time),
+    NEW.calories,
+    NEW.protein,
+    NEW.carbs,
+    NEW.fat,
+    1
+  )
+  ON CONFLICT (user_id, date)
+  DO UPDATE SET
+    total_calories = daily_summaries.total_calories + NEW.calories,
+    total_protein = daily_summaries.total_protein + NEW.protein,
+    total_carbs = daily_summaries.total_carbs + NEW.carbs,
+    total_fat = daily_summaries.total_fat + NEW.fat,
+    meals_logged = daily_summaries.meals_logged + 1;
+  
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER meal_logged_trigger
+AFTER INSERT ON meals
+FOR EACH ROW
+EXECUTE FUNCTION update_daily_summary();
+```
+
+---
+
+## 🎯 Implementation Priority
+
+### Phase 1: Core Backend (Week 1)
+1. ✅ Supabase setup complete
+2. ⏳ Food analysis API (OpenAI integration)
+3. ⏳ Basic health alerts (rule-based)
+4. ⏳ Save meals to database
+
+### Phase 2: AI Features (Week 2)
+5. ⏳ Nutrition recommendations
+6. ⏳ Meal suggestions
+7. ⏳ Daily summaries calculation
+8. ⏳ Health alert generation
+
+### Phase 3: Polish (Week 3)
+9. ⏳ Image recognition optimization
+10. ⏳ Performance tuning
+11. ⏳ Error handling & logging
+12. ⏳ Caching strategies
+
+---
+
+## 🔐 Security Considerations
+
+- **API Keys**: Store in environment variables, never in frontend code
+- **Rate Limiting**: Prevent API abuse (use Vercel rate limiting)
+- **Input Validation**: Sanitize all user inputs before AI processing
+- **Supabase RLS**: Already enforced at database level
+- **HTTPS Only**: Required for production (Vercel provides free SSL)
+- **CORS**: Configure allowed origins in API routes
+
+---
+
+## 📚 Recommended Resources
+
+- [Supabase JavaScript Client Docs](https://supabase.com/docs/reference/javascript)
+- [OpenAI API Documentation](https://platform.openai.com/docs/api-reference)
+- [Next.js API Routes](https://nextjs.org/docs/app/building-your-application/routing/route-handlers)
+- [USDA Food Database API](https://fdc.nal.usda.gov/api-guide.html)
+- [Vercel Deployment Guide](https://vercel.com/docs/deployments/overview)
+
+---
+
+## 🚨 Common Issues & Solutions
+
+### Issue: OpenAI API timeout in serverless function
+**Solution**: Use streaming responses or implement queue system
+
+### Issue: High OpenAI costs
+**Solution**: 
+- Cache common food items in database
+- Use GPT-3.5-turbo for simple queries ($0.002 per request)
+- Batch multiple food items in one request
+
+### Issue: Image uploads not working
+**Solution**: Use Supabase Storage for images, then send URL to vision API
+
+### Issue: Slow response times
+**Solution**: 
+- Implement caching with Redis
+- Use database indexes on frequently queried columns
+- Optimize AI prompts for faster responses
+
+---
+
+## 📈 Monitoring & Logging
+
+### Recommended Tools
+- **Vercel Analytics**: Built-in performance monitoring
+- **Supabase Dashboard**: Database queries and performance
+- **OpenAI Usage Dashboard**: Track API costs and usage
+- **Sentry**: Error tracking and monitoring
+
+### Key Metrics to Track
+- Food analysis API response time
+- OpenAI API costs per user
+- Database query performance
+- Daily active users
+- Meal logging success rate
+
+---
+
+**Next Steps**: 
+1. Set up OpenAI API key
+2. Create first API route for food analysis
+3. Test with sample meals
+4. Add health alerts logic
+5. Implement recommendations
+
+Keep it simple and iterate! 🚀
