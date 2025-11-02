@@ -1,44 +1,45 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase'
+import { User } from '@supabase/supabase-js'
 
 interface AuthContextType {
-  isAuthenticated: boolean
-  user: any
-  login: (email: string, password: string) => Promise<void>
-  logout: () => void
+  user: User | null
+  loading: boolean
+  signOut: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [user, setUser] = useState(null)
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Check for existing session
-    const token = localStorage.getItem('auth-token')
-    if (token) {
-      setIsAuthenticated(true)
-      // In a real app, validate token and get user data
-    }
+    // Check active session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null)
+      setLoading(false)
+    })
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+    })
+
+    return () => subscription.unsubscribe()
   }, [])
 
-  const login = async (email: string, password: string) => {
-    // Simulate login
-    localStorage.setItem('auth-token', 'mock-token')
-    setIsAuthenticated(true)
-    setUser({ email })
-  }
-
-  const logout = () => {
-    localStorage.removeItem('auth-token')
-    setIsAuthenticated(false)
+  const signOut = async () => {
+    await supabase.auth.signOut()
     setUser(null)
   }
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, user, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, signOut }}>
       {children}
     </AuthContext.Provider>
   )

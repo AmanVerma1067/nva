@@ -1,5 +1,6 @@
 'use client'
-
+import { supabase } from '@/lib/supabase'
+import { useToast } from '@/hooks/use-toast'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -11,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Progress } from '@/components/ui/progress'
 import { ArrowLeft, ArrowRight, User, Heart, Pill, Target } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+
 
 const MEDICAL_CONDITIONS = [
   'Diabetes Type 1',
@@ -45,7 +47,9 @@ const DIETARY_RESTRICTIONS = [
 
 export function HealthOnboarding() {
   const router = useRouter()
+  const { toast } = useToast() // ✅ moved here — inside component
   const [currentStep, setCurrentStep] = useState(1)
+  const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
     age: '',
     gender: '',
@@ -62,14 +66,61 @@ export function HealthOnboarding() {
   const totalSteps = 5
   const progress = (currentStep / totalSteps) * 100
 
-  const handleNext = () => {
-    if (currentStep < totalSteps) {
-      setCurrentStep(currentStep + 1)
-    } else {
-      // Complete onboarding
+const handleNext = async () => {
+  if (currentStep < totalSteps) {
+    setCurrentStep(currentStep + 1)
+  } else {
+    // Complete onboarding - save to Supabase
+    setIsLoading(true)
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) {
+        toast({
+          title: "Error",
+          description: "No user found. Please log in again.",
+          variant: "destructive"
+        })
+        router.push('/auth')
+        return
+      }
+
+      // Update profile with onboarding data
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          age: parseInt(formData.age) || null,
+          gender: formData.gender || null,
+          activity_level: formData.activityLevel || null,
+          primary_goal: formData.healthGoals[0] || 'General Wellness',
+          medical_conditions: formData.medicalConditions || [],
+          dietary_restrictions: formData.dietaryRestrictions || [],
+          food_allergies: formData.allergies || null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id)
+
+      if (error) throw error
+
+      toast({
+        title: "Profile Complete!",
+        description: "Your health profile has been saved.",
+      })
+
       router.push('/dashboard')
+    } catch (error: any) {
+      console.error('Onboarding error:', error)
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      })
+    } finally {
+      setIsLoading(false)
     }
   }
+}
 
   const handleBack = () => {
     if (currentStep > 1) {
