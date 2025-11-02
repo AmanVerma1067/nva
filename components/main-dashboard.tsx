@@ -1,17 +1,16 @@
-'use client'
+"use client"
 
-import { useState } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Camera, Mic, Type, Heart, Activity, TrendingUp, AlertTriangle, CheckCircle, Clock, Zap } from 'lucide-react'
-import { FoodInputTabs } from '@/components/food-input-tabs'
-import { NutritionChart } from '@/components/nutrition-chart'
-import { HealthInsights } from '@/components/health-insights'
+import { useState } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Progress } from "@/components/ui/progress"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Activity, TrendingUp, AlertTriangle, Clock, Zap } from "lucide-react"
+import { FoodInputTabs } from "@/components/food-input-tabs"
+import { NutritionChart } from "@/components/nutrition-chart"
+import { AIRecommendations } from "@/components/ai-recommendations"
+import { MedicalConditionAlerts } from "@/components/medical-condition-alerts"
+import { MealSuggestions } from "@/components/meal-suggestions"
 
 export function MainDashboard() {
   const [todayCalories] = useState(1450)
@@ -21,46 +20,53 @@ export function MainDashboard() {
 
   const healthAlerts = [
     {
-      type: 'warning',
-      message: 'High sodium intake detected - consider reducing salt for your hypertension',
-      time: '2 hours ago'
+      type: "warning",
+      message: "High sodium intake detected - consider reducing salt for your hypertension",
+      time: "2 hours ago",
     },
     {
-      type: 'info',
-      message: 'Great job staying within your carb limit today!',
-      time: '4 hours ago'
-    }
+      type: "info",
+      message: "Great job staying within your carb limit today!",
+      time: "4 hours ago",
+    },
   ]
 
   const todayMetrics = [
-    { label: 'Calories', value: todayCalories, goal: calorieGoal, unit: 'kcal', color: 'bg-blue-500' },
-    { label: 'Protein', value: 85, goal: 120, unit: 'g', color: 'bg-green-500' },
-    { label: 'Carbs', value: 180, goal: 250, unit: 'g', color: 'bg-orange-500' },
-    { label: 'Fat', value: 65, goal: 80, unit: 'g', color: 'bg-purple-500' },
+    { label: "Calories", value: todayCalories, goal: calorieGoal, unit: "kcal", color: "bg-blue-500" },
+    { label: "Protein", value: 85, goal: 120, unit: "g", color: "bg-green-500" },
+    { label: "Carbs", value: 180, goal: 250, unit: "g", color: "bg-orange-500" },
+    { label: "Fat", value: 65, goal: 80, unit: "g", color: "bg-purple-500" },
   ]
 
   return (
     <div className="space-y-8">
       {/* Health Alerts Section */}
-      <div className="space-y-4">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Health Alerts & Insights
-        </h2>
-        <div className="grid gap-4">
-          {healthAlerts.map((alert, index) => (
-            <Alert key={index} className={alert.type === 'warning' ? 'border-amber-200 bg-amber-50 dark:bg-amber-900/20' : 'border-blue-200 bg-blue-50 dark:bg-blue-900/20'}>
-              <AlertTriangle className={`h-4 w-4 ${alert.type === 'warning' ? 'text-amber-600' : 'text-blue-600'}`} />
-              <AlertDescription className="flex justify-between items-center">
-                <span>{alert.message}</span>
-                <span className="text-xs text-gray-500">{alert.time}</span>
-              </AlertDescription>
-            </Alert>
-          ))}
+      {healthAlerts.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Health Alerts</h2>
+          <div className="grid gap-4">
+            {healthAlerts.map((alert, index) => (
+              <Alert
+                key={index}
+                className={
+                  alert.type === "warning"
+                    ? "border-amber-200 bg-amber-50 dark:bg-amber-900/20"
+                    : "border-blue-200 bg-blue-50 dark:bg-blue-900/20"
+                }
+              >
+                <AlertTriangle className={`h-4 w-4 ${alert.type === "warning" ? "text-amber-600" : "text-blue-600"}`} />
+                <AlertDescription className="flex justify-between items-center">
+                  <span>{alert.message}</span>
+                  <span className="text-xs text-gray-500">{alert.time}</span>
+                </AlertDescription>
+              </Alert>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="border-2 border-medical-blue/20">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Today's Calories</CardTitle>
@@ -68,9 +74,7 @@ export function MainDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{todayCalories}</div>
-            <p className="text-xs text-muted-foreground">
-              of {calorieGoal} goal
-            </p>
+            <p className="text-xs text-muted-foreground">of {calorieGoal} goal</p>
             <Progress value={(todayCalories / calorieGoal) * 100} className="mt-2" />
           </CardContent>
         </Card>
@@ -82,41 +86,21 @@ export function MainDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{waterIntake}</div>
-            <p className="text-xs text-muted-foreground">
-              of {waterGoal} glasses
-            </p>
+            <p className="text-xs text-muted-foreground">of {waterGoal} glasses</p>
             <Progress value={(waterIntake / waterGoal) * 100} className="mt-2" />
-          </CardContent>
-        </Card>
-
-        <Card className="border-2 border-orange-200">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Health Score</CardTitle>
-            <Heart className="h-4 w-4 text-orange-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">85</div>
-            <p className="text-xs text-muted-foreground">
-              +5 from yesterday
-            </p>
-            <Badge variant="secondary" className="mt-2 bg-green-100 text-green-800">
-              Excellent
-            </Badge>
           </CardContent>
         </Card>
 
         <Card className="border-2 border-purple-200">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Streak</CardTitle>
+            <CardTitle className="text-sm font-medium">Status</CardTitle>
             <TrendingUp className="h-4 w-4 text-purple-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">12</div>
-            <p className="text-xs text-muted-foreground">
-              days logging food
-            </p>
-            <Badge variant="secondary" className="mt-2 bg-purple-100 text-purple-800">
-              On Fire! 🔥
+            <div className="text-2xl font-bold">Healthy</div>
+            <p className="text-xs text-muted-foreground">On track today</p>
+            <Badge variant="secondary" className="mt-2 bg-green-100 text-green-800">
+              Excellent
             </Badge>
           </CardContent>
         </Card>
@@ -125,18 +109,23 @@ export function MainDashboard() {
       {/* Multi-Modal Food Input */}
       <Card className="border-2 border-medical-blue/20">
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Type className="h-5 w-5 text-medical-blue" />
-            <span>Log Your Food</span>
-          </CardTitle>
-          <CardDescription>
-            Use text, image, or voice to quickly log your meals
-          </CardDescription>
+          <CardTitle>Log Your Food</CardTitle>
+          <CardDescription>Use text, voice, or image to quickly log your meals</CardDescription>
         </CardHeader>
         <CardContent>
           <FoodInputTabs />
         </CardContent>
       </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="space-y-6">
+          <AIRecommendations />
+          <MealSuggestions />
+        </div>
+        <div>
+          <MedicalConditionAlerts />
+        </div>
+      </div>
 
       {/* Dashboard Content */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -145,9 +134,7 @@ export function MainDashboard() {
           <Card>
             <CardHeader>
               <CardTitle>Today's Nutrition</CardTitle>
-              <CardDescription>
-                Track your macronutrients and stay within your health goals
-              </CardDescription>
+              <CardDescription>Track your macronutrients</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -174,21 +161,22 @@ export function MainDashboard() {
           <NutritionChart />
         </div>
 
-        {/* Health Insights Sidebar */}
-        <div className="space-y-6">
-          <HealthInsights />
-          
+        {/* Recent Meals Sidebar */}
+        <div>
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Recent Meals</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {[
-                { meal: 'Grilled Salmon Salad', time: '12:30 PM', calories: 420, status: 'good' },
-                { meal: 'Greek Yogurt & Berries', time: '9:15 AM', calories: 180, status: 'excellent' },
-                { meal: 'Oatmeal with Banana', time: '7:30 AM', calories: 250, status: 'good' }
+                { meal: "Grilled Salmon Salad", time: "12:30 PM", calories: 420 },
+                { meal: "Greek Yogurt & Berries", time: "9:15 AM", calories: 180 },
+                { meal: "Oatmeal with Banana", time: "7:30 AM", calories: 250 },
               ].map((meal, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg"
+                >
                   <div>
                     <p className="font-medium text-sm">{meal.meal}</p>
                     <p className="text-xs text-gray-500 flex items-center">
@@ -196,19 +184,7 @@ export function MainDashboard() {
                       {meal.time}
                     </p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium">{meal.calories} cal</p>
-                    <Badge 
-                      variant="secondary" 
-                      className={`text-xs ${
-                        meal.status === 'excellent' 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-blue-100 text-blue-800'
-                      }`}
-                    >
-                      {meal.status}
-                    </Badge>
-                  </div>
+                  <p className="text-sm font-medium">{meal.calories} cal</p>
                 </div>
               ))}
             </CardContent>

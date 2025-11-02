@@ -29,7 +29,7 @@
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
-    
+
     /* Medical-grade colors */
     --medical-blue: 210 100% 40%;
     --medical-green: 142 76% 36%;
@@ -91,14 +91,17 @@
   }
 }
 
+/* Fixed focus indicators to use hsl() color from CSS variable instead of invalid Tailwind class */
 /* Focus indicators for accessibility */
 .focus-visible:focus {
-  @apply ring-2 ring-medical-blue ring-offset-2;
+  outline: 2px solid hsl(var(--medical-blue));
+  outline-offset: 2px;
 }
 
 /* Medical alert animations */
 @keyframes pulse-medical {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
   50% {

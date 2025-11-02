@@ -1,61 +1,52 @@
-'use client'
+"use client"
 
-import { useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Checkbox } from '@/components/ui/checkbox'
-import { ArrowLeft, Mail, Lock, User, Shield } from 'lucide-react'
-import { useRouter } from 'next/navigation'
-import { useToast } from '@/hooks/use-toast'
-import { supabase } from '@/lib/supabase'
+import { useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Checkbox } from "@/components/ui/checkbox"
+import { ArrowLeft, Mail, Lock, User, Shield, Loader2 } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/components/auth-provider"
 
 export function AuthFlow() {
   const router = useRouter()
   const { toast } = useToast()
+  const { login } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
-  const [healthDataConsent, setHealthDataConsent] = useState(false)
-  const [privacyConsent, setPrivacyConsent] = useState(false)
-  
-  const [loginEmail, setLoginEmail] = useState('')
-  const [loginPassword, setLoginPassword] = useState('')
-  const [signupFullName, setSignupFullName] = useState('')
-  const [signupEmail, setSignupEmail] = useState('')
-  const [signupPassword, setSignupPassword] = useState('')
+  const [termsConsent, setTermsConsent] = useState(false)
+  const [loginEmail, setLoginEmail] = useState("")
+  const [loginPassword, setLoginPassword] = useState("")
+  const [signupName, setSignupName] = useState("")
+  const [signupEmail, setSignupEmail] = useState("")
+  const [signupPassword, setSignupPassword] = useState("")
 
   const handleLogin = async () => {
     if (!loginEmail || !loginPassword) {
       toast({
         title: "Missing Information",
-        description: "Please fill in all fields.",
-        variant: "destructive"
+        description: "Please enter your email and password.",
+        variant: "destructive",
       })
       return
     }
 
     setIsLoading(true)
-
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: loginEmail,
-        password: loginPassword,
-      })
-
-      if (error) throw error
-
+      await login(loginEmail, loginPassword)
       toast({
-        title: "Welcome back!",
-        description: "Login successful.",
+        title: "Success",
+        description: "Signed in successfully",
       })
-      
-      router.push('/dashboard')
-    } catch (error: any) {
+      router.push("/dashboard")
+    } catch (error) {
       toast({
-        title: "Login Failed",
-        description: error.message,
-        variant: "destructive"
+        title: "Sign In Failed",
+        description: error instanceof Error ? error.message : "Please check your credentials",
+        variant: "destructive",
       })
     } finally {
       setIsLoading(false)
@@ -63,67 +54,54 @@ export function AuthFlow() {
   }
 
   const handleSignup = async () => {
-    if (!healthDataConsent || !privacyConsent) {
+    if (!termsConsent) {
       toast({
-        title: "Consent Required",
-        description: "Please accept both consent agreements.",
-        variant: "destructive"
+        title: "Terms Required",
+        description: "Please accept the terms and conditions to continue.",
+        variant: "destructive",
       })
       return
     }
 
-    if (!signupEmail || !signupPassword || !signupFullName) {
+    if (!signupEmail || !signupPassword || !signupName) {
       toast({
         title: "Missing Information",
         description: "Please fill in all fields.",
-        variant: "destructive"
+        variant: "destructive",
       })
       return
     }
 
     setIsLoading(true)
-
     try {
-      // Step 1: Sign up user
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: signupEmail,
-        password: signupPassword,
-        options: {
-          data: {
-            full_name: signupFullName
-          }
-        }
+      const response = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: signupEmail,
+          password: signupPassword,
+          name: signupName,
+          action: "signup",
+        }),
       })
 
-      if (authError) throw authError
-      if (!authData.user) throw new Error("No user data returned")
+      const data = await response.json()
 
-      // Step 2: Create user profile in users table
-      const { error: userError } = await supabase
-        .from('users')  // ✅ Changed from 'profiles' to 'users'
-        .insert({
-          id: authData.user.id,
-          email: signupEmail,
-          full_name: signupFullName,
-        })
-
-      if (userError) {
-        console.error('User creation error:', userError)
-        // Don't throw - user will complete profile in onboarding
+      if (!response.ok) {
+        throw new Error(data.error || "Sign up failed")
       }
 
       toast({
-        title: "Account Created!",
-        description: "Please complete your health profile.",
+        title: "Account Created",
+        description: "Please check your email to confirm your account",
       })
 
-      router.push('/onboarding')
-      
-    } catch (error: any) {
+      router.push("/onboarding")
+    } catch (error) {
       toast({
-        title: "Signup Failed",
-        description: error.message,
-        variant: "destructive"
+        title: "Sign Up Failed",
+        description: error instanceof Error ? error.message : "An error occurred",
+        variant: "destructive",
       })
     } finally {
       setIsLoading(false)
@@ -133,11 +111,7 @@ export function AuthFlow() {
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       <div className="max-w-md w-full space-y-6">
-        <Button
-          variant="ghost"
-          onClick={() => router.push('/')}
-          className="mb-4"
-        >
+        <Button variant="ghost" onClick={() => router.push("/")} className="mb-4">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Welcome
         </Button>
@@ -145,9 +119,7 @@ export function AuthFlow() {
         <Card className="border-2 border-medical-blue/20">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl">Secure Access</CardTitle>
-            <CardDescription>
-              Your health data is protected with medical-grade security
-            </CardDescription>
+            <CardDescription>Your health data is protected with medical-grade security</CardDescription>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="login" className="space-y-4">
@@ -158,30 +130,32 @@ export function AuthFlow() {
 
               <TabsContent value="login" className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="login-email">Email</Label>
+                  <Label htmlFor="email">Email</Label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                     <Input
-                      id="login-email"
+                      id="email"
                       type="email"
                       placeholder="your@email.com"
                       className="pl-10"
                       value={loginEmail}
                       onChange={(e) => setLoginEmail(e.target.value)}
+                      disabled={isLoading}
                     />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="login-password">Password</Label>
+                  <Label htmlFor="password">Password</Label>
                   <div className="relative">
                     <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                     <Input
-                      id="login-password"
+                      id="password"
                       type="password"
                       placeholder="••••••••"
                       className="pl-10"
                       value={loginPassword}
                       onChange={(e) => setLoginPassword(e.target.value)}
+                      disabled={isLoading}
                     />
                   </div>
                 </div>
@@ -190,21 +164,29 @@ export function AuthFlow() {
                   disabled={isLoading}
                   className="w-full bg-medical-blue hover:bg-medical-blue/90"
                 >
-                  {isLoading ? 'Signing In...' : 'Sign In Securely'}
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Signing In...
+                    </>
+                  ) : (
+                    "Sign In Securely"
+                  )}
                 </Button>
               </TabsContent>
 
               <TabsContent value="signup" className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="signup-name">Full Name</Label>
+                  <Label htmlFor="name">Full Name</Label>
                   <div className="relative">
                     <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                     <Input
-                      id="signup-name"
+                      id="name"
                       placeholder="Your full name"
                       className="pl-10"
-                      value={signupFullName}
-                      onChange={(e) => setSignupFullName(e.target.value)}
+                      value={signupName}
+                      onChange={(e) => setSignupName(e.target.value)}
+                      disabled={isLoading}
                     />
                   </div>
                 </div>
@@ -219,6 +201,7 @@ export function AuthFlow() {
                       className="pl-10"
                       value={signupEmail}
                       onChange={(e) => setSignupEmail(e.target.value)}
+                      disabled={isLoading}
                     />
                   </div>
                 </div>
@@ -233,39 +216,29 @@ export function AuthFlow() {
                       className="pl-10"
                       value={signupPassword}
                       onChange={(e) => setSignupPassword(e.target.value)}
+                      disabled={isLoading}
                     />
                   </div>
                 </div>
 
                 <div className="space-y-4 pt-4 border-t">
-                  <div className="flex items-start space-x-2">
+                  <div className="flex items-start space-x-3">
                     <Checkbox
-                      id="health-consent"
-                      checked={healthDataConsent}
-                      onCheckedChange={(checked) => setHealthDataConsent(checked === true)}
+                      id="terms-consent"
+                      checked={termsConsent}
+                      onCheckedChange={(checked) => setTermsConsent(checked as boolean)}
+                      disabled={isLoading}
+                      className="mt-1"
                     />
-                    <div className="grid gap-1.5 leading-none">
-                      <Label htmlFor="health-consent" className="text-sm font-medium cursor-pointer">
-                        Health Data Consent
+                    <div className="grid gap-2 leading-none">
+                      <Label
+                        htmlFor="terms-consent"
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                      >
+                        I agree to the Terms and Conditions
                       </Label>
                       <p className="text-xs text-muted-foreground">
-                        I consent to the secure processing of my health data
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start space-x-2">
-                    <Checkbox
-                      id="privacy-consent"
-                      checked={privacyConsent}
-                      onCheckedChange={(checked) => setPrivacyConsent(checked === true)}
-                    />
-                    <div className="grid gap-1.5 leading-none">
-                      <Label htmlFor="privacy-consent" className="text-sm font-medium cursor-pointer">
-                        Privacy Policy Agreement
-                      </Label>
-                      <p className="text-xs text-muted-foreground">
-                        I agree to the privacy policy and terms
+                        I accept the terms of service, privacy policy, and health data processing agreement
                       </p>
                     </div>
                   </div>
@@ -273,17 +246,18 @@ export function AuthFlow() {
 
                 <Button
                   onClick={handleSignup}
-                  disabled={isLoading || !healthDataConsent || !privacyConsent}
+                  disabled={isLoading || !termsConsent}
                   className="w-full bg-medical-blue hover:bg-medical-blue/90"
                 >
-                  {isLoading ? 'Creating Account...' : 'Create Secure Account'}
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Creating Account...
+                    </>
+                  ) : (
+                    "Create Secure Account"
+                  )}
                 </Button>
-
-                {(!healthDataConsent || !privacyConsent) && (
-                  <p className="text-xs text-center text-amber-600">
-                    Please accept both agreements to continue
-                  </p>
-                )}
               </TabsContent>
             </Tabs>
 
@@ -291,7 +265,7 @@ export function AuthFlow() {
               <div className="flex items-center space-x-2">
                 <Shield className="h-4 w-4 text-medical-blue" />
                 <p className="text-xs text-blue-800 dark:text-blue-200">
-                  Your data is encrypted and stored securely
+                  Your data is encrypted and stored securely following HIPAA compliance standards
                 </p>
               </div>
             </div>
