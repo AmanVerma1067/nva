@@ -2,8 +2,6 @@
 
 A focused, AI-powered nutrition tracking platform with goal-based recommendations and medical condition awareness built with Next.js 14 and Supabase.
 
-![Nutri-Vision AI Dashboard](https://via.placeholder.com/800x400/0066CC/FFFFFF?text=Nutri-Vision+AI)
-
 ## 🎯 Core Features
 
 ### Smart Food Logging
