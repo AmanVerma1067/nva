@@ -1,388 +1,345 @@
-# Nutri-Vision AI - Personal Health Nutrition Dashboard
+# Nutri-Vision AI - Smart Nutrition Tracker
 
-A comprehensive, medical-grade nutrition analysis platform with AI-powered insights, multi-modal food logging, and medical condition awareness built with Next.js 14.
+A focused, AI-powered nutrition tracking platform with goal-based recommendations and medical condition awareness built with Next.js 14 and Supabase.
 
-![Nutri-Vision AI Dashboard](https://via.placeholder.com/800x400/0066CC/FFFFFF?text=Nutri-Vision+AI+Dashboard)
+![Nutri-Vision AI Dashboard](https://via.placeholder.com/800x400/0066CC/FFFFFF?text=Nutri-Vision+AI)
 
-## 🏥 Medical-Grade Features
+## 🎯 Core Features
 
-### Privacy & Security First
-- **HIPAA-Compliant Data Handling**: End-to-end encryption for all health data
-- **Medical-Grade Security**: AES-256 encryption with zero-knowledge architecture
-- **Granular Privacy Controls**: User-controlled data sharing with healthcare providers
-- **Emergency Access**: Secure emergency medical information access
-- **Data Portability**: Easy export in standard medical formats
+### Smart Food Logging
+- **Text Input with Voice-to-Text**: Type or speak your meals naturally
+- **Image Recognition**: Take photos of your food for automatic logging
+- **AI Analysis**: Automatic macro calculation (calories, protein, carbs, fat)
 
-### Health Condition Integration
-- **15+ Supported Medical Conditions**: Diabetes, hypertension, heart disease, kidney disease, and more
-- **Medication Interaction Checking**: Real-time alerts for food-drug interactions
-- **Allergen Detection**: Immediate warnings for food allergies and intolerances
-- **Symptom Correlation**: Track how food intake affects health symptoms
-- **Lab Results Integration**: Connect glucose, cholesterol, and other health metrics
+### Health-Aware Tracking
+- **Medical Condition Alerts**: Real-time warnings for foods that conflict with your conditions
+  - Diabetes → High carb warnings
+  - Hypertension → High sodium alerts
+  - Allergies → Immediate allergen detection
+- **Dietary Restrictions**: Respects vegetarian, vegan, gluten-free, etc.
+- **Goal-Based Tracking**: Monitor progress toward weight loss, muscle gain, or wellness goals
 
-## 🚀 Core Functionality
+### AI-Powered Recommendations
+- **Daily Nutrition Suggestions**: "You're 35g short on protein today - try Greek yogurt"
+- **Goal-Aligned Meal Ideas**: Meal suggestions based on your specific health goals
+- **Smart Insights**: AI analyzes your patterns and provides actionable advice
 
-### 1. Authentication & Onboarding
-- **Secure Authentication**: Medical-grade login with health data consent
-- **Multi-Step Health Onboarding**:
-  - Basic demographics (age, gender, activity level)
-  - Medical conditions selection with educational tooltips
-  - Dietary restrictions and food allergies
-  - Current medications for interaction checking
-  - Health goals setting with progress tracking
-  - Emergency contact information
-
-### 2. Multi-Modal Food Logging
-- **Text Input**: Smart auto-complete with medical condition awareness
-- **Image Recognition**: AI-powered food identification with portion estimation
-- **Voice Logging**: Natural language processing for hands-free meal logging
-- **Barcode Scanning**: Quick product identification and nutritional analysis
-- **Recipe Analysis**: Break down complex meals into individual components
-
-### 3. Health-Aware Dashboard
-- **Priority Health Alerts**: Critical notifications for dietary conflicts
-- **Real-Time Analytics**: Live nutrition tracking with health context
-- **Medical Insights Panel**: Condition-specific recommendations and warnings
-- **Progress Visualization**: Interactive charts showing health goal progress
-- **Medication Reminders**: Integrated with meal timing for optimal absorption
-
-### 4. Personalized Health Insights
-- **AI-Powered Recommendations**: Machine learning-based meal suggestions
-- **Predictive Health Analytics**: Risk assessment for nutritional deficiencies
-- **Symptom Pattern Recognition**: Identify food triggers for health conditions
-- **Healthcare Provider Reports**: Shareable nutrition summaries for medical appointments
-- **Educational Content**: Condition-specific nutrition education and tips
-
-### 5. Medical Profile Management
-- **Comprehensive Health Profile**: Complete medical history with privacy controls
-- **Medication Schedule**: Track timing, dosage, and food interactions
-- **Allergy Management**: Critical allergen tracking with emergency protocols
-- **Healthcare Provider Integration**: Secure data sharing with medical professionals
-- **Emergency Medical Information**: Quick access for first responders
-
-## 🎯 User Experience Features
-
-### Accessibility (WCAG 2.1 AA Compliant)
-- **High Contrast Mode**: Enhanced visibility for vision impairments
-- **Screen Reader Optimization**: Full compatibility with assistive technologies
-- **Voice Navigation**: Hands-free app control for motor disabilities
-- **Scalable Text**: Support for 200% zoom without functionality loss
-- **Keyboard Navigation**: Complete app access without mouse/touch
-- **Multi-Language Support**: Medical terminology in multiple languages
-
-### Progressive Web App (PWA)
-- **Offline Functionality**: Core features work without internet connection
-- **Push Notifications**: Critical health alerts and medication reminders
-- **Home Screen Installation**: Native app-like experience
-- **Background Sync**: Automatic data synchronization when online
-- **Cross-Platform**: Works on iOS, Android, and desktop browsers
-
-### Responsive Design
-- **Mobile-First**: Optimized for smartphone usage
-- **Tablet Optimization**: Enhanced layouts for larger screens
-- **Desktop Experience**: Full-featured dashboard for comprehensive analysis
-- **Touch-Friendly**: Large buttons and intuitive gestures
-- **Adaptive UI**: Interface adjusts based on user's medical needs
-
-## 🔧 Technical Architecture
-
-### Frontend Stack
-- **Next.js 14**: App Router with Server Components for optimal performance
-- **TypeScript**: Type-safe development with medical data validation
-- **Tailwind CSS**: Utility-first styling with medical-grade color system
-- **Shadcn/ui**: Accessible component library with medical customizations
-- **Recharts**: Interactive data visualization for health metrics
-- **React Hook Form**: Medical form validation with error handling
-
-### Key Dependencies
-\`\`\`json
-{
-  "next": "^14.0.0",
-  "react": "^18.0.0",
-  "typescript": "^5.0.0",
-  "tailwindcss": "^3.3.0",
-  "@radix-ui/react-*": "Latest",
-  "recharts": "^2.8.0",
-  "react-hook-form": "^7.45.0",
-  "crypto-js": "^4.1.1",
-  "react-speech-kit": "^3.0.1"
-}
-\`\`\`
-
-### Performance Optimizations
-- **Critical Health Alerts**: Load within 500ms for emergency situations
-- **Lazy Loading**: Non-essential components load on demand
-- **Image Optimization**: Compressed images with medical accuracy preservation
-- **Code Splitting**: Route-based bundling for faster initial loads
-- **Service Worker**: Offline-first architecture for reliability
-
-## 📊 Data Visualization
-
-### Interactive Charts
-- **Nutrition Timeline**: Daily, weekly, and monthly nutrition trends
-- **Blood Sugar Correlation**: Glucose levels vs. carbohydrate intake
-- **Medication Timing**: Visual schedule with meal coordination
-- **Health Goal Progress**: Ring charts with medical context
-- **Symptom Tracking**: Correlation analysis with food intake
-- **Nutrient Deficiency Risk**: Predictive indicators with recommendations
-
-### Medical-Grade Reporting
-- **Healthcare Provider Reports**: Professional summaries for medical appointments
-- **Lab Results Integration**: Visual correlation with nutrition data
-- **Emergency Medical Cards**: Critical information for first responders
-- **Insurance Documentation**: Nutrition therapy progress reports
-- **Research Participation**: Anonymized data for medical studies
-
-## 🛡️ Security & Privacy
-
-### Data Protection
-- **End-to-End Encryption**: All health data encrypted in transit and at rest
-- **Zero-Knowledge Architecture**: Server cannot access unencrypted health data
-- **HIPAA Compliance**: Meets healthcare data protection standards
-- **SOC 2 Type II**: Annual security audits and compliance verification
-- **GDPR Compliance**: European data protection regulation adherence
-
-### Privacy Controls
-- **Granular Permissions**: Control what data is shared with whom
-- **Data Retention Policies**: User-controlled data lifecycle management
-- **Right to Deletion**: Complete data removal on user request
-- **Audit Logs**: Track all access to sensitive health information
-- **Anonymous Analytics**: Optional usage data for app improvement
+### Simple Dashboard
+- **Today's Stats**: Calories, water intake, and macro breakdown
+- **Recent Meals**: Quick view of what you've logged
+- **Weekly Trends**: 7-day nutrition chart
+- **Health Alerts**: Priority warnings for dietary conflicts
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-- Node.js 18+ and npm/yarn
-- Modern web browser with JavaScript enabled
-- Camera access for food photo logging (optional)
-- Microphone access for voice logging (optional)
+- Node.js 18+ and npm
+- Supabase account
+- Modern web browser
 
 ### Installation
 
 1. **Clone the repository**
-\`\`\`bash
-git clone https://github.com/your-org/nutri-vision-ai.git
+```bash
+git clone https://github.com/yourusername/nutri-vision-ai.git
 cd nutri-vision-ai
-\`\`\`
+```
 
 2. **Install dependencies**
-\`\`\`bash
+```bash
 npm install
-# or
-yarn install
-\`\`\`
+```
 
-3. **Environment Setup**
-\`\`\`bash
-cp .env.example .env.local
-\`\`\`
+3. **Set up Supabase**
 
-Configure the following environment variables:
-\`\`\`env
-# Core Application
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-NEXT_PUBLIC_API_URL=http://localhost:5000
+Create a Supabase project at [supabase.com](https://supabase.com)
 
-# Medical APIs
-NEXT_PUBLIC_MEDICAL_API_KEY=your-medical-api-key
-NEXT_PUBLIC_DRUG_INTERACTION_API=your-drug-api-key
-NEXT_PUBLIC_NUTRITION_API_KEY=your-nutrition-api-key
+Run this SQL in your Supabase SQL Editor:
 
-# AI Services
-NEXT_PUBLIC_OPENAI_API_KEY=your-openai-key
-NEXT_PUBLIC_VISION_API_KEY=your-vision-api-key
-NEXT_PUBLIC_SPEECH_API_KEY=your-speech-api-key
+```sql
+-- Enable UUID extension
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
-# Security
-NEXT_PUBLIC_ENCRYPTION_KEY=your-256-bit-encryption-key
-NEXTAUTH_SECRET=your-nextauth-secret
-NEXTAUTH_URL=http://localhost:3000
+-- Profiles table
+CREATE TABLE profiles (
+  id UUID REFERENCES auth.users(id) PRIMARY KEY,
+  age INTEGER,
+  gender TEXT,
+  activity_level TEXT,
+  primary_goal TEXT,
+  medical_conditions TEXT[],
+  dietary_restrictions TEXT[],
+  food_allergies TEXT,
+  daily_calorie_goal INTEGER DEFAULT 2000,
+  daily_protein_goal INTEGER DEFAULT 150,
+  daily_carbs_goal INTEGER DEFAULT 250,
+  daily_fat_goal INTEGER DEFAULT 65,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
 
-# Database (Production)
-DATABASE_URL=your-secure-database-url
-REDIS_URL=your-redis-cache-url
+-- Meals table
+CREATE TABLE meals (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  meal_name TEXT,
+  meal_time TIMESTAMP DEFAULT NOW(),
+  meal_type TEXT,
+  input_method TEXT,
+  raw_input TEXT,
+  food_items JSONB,
+  calories INTEGER,
+  protein INTEGER,
+  carbs INTEGER,
+  fat INTEGER,
+  sodium INTEGER,
+  created_at TIMESTAMP DEFAULT NOW()
+);
 
-# Healthcare Integration
-FHIR_SERVER_URL=your-fhir-server
-HL7_INTEGRATION_KEY=your-hl7-key
-\`\`\`
+-- Health alerts table
+CREATE TABLE health_alerts (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  meal_id UUID REFERENCES meals(id) ON DELETE CASCADE,
+  alert_type TEXT,
+  severity TEXT,
+  message TEXT,
+  is_dismissed BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT NOW()
+);
 
-4. **Run the development server**
-\`\`\`bash
+-- Daily summaries table
+CREATE TABLE daily_summaries (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  date DATE UNIQUE,
+  total_calories INTEGER DEFAULT 0,
+  total_protein INTEGER DEFAULT 0,
+  total_carbs INTEGER DEFAULT 0,
+  total_fat INTEGER DEFAULT 0,
+  total_sodium INTEGER DEFAULT 0,
+  water_intake INTEGER DEFAULT 0,
+  meals_logged INTEGER DEFAULT 0,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Enable Row Level Security
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE meals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE health_alerts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE daily_summaries ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies
+CREATE POLICY "Users can view own profile" ON profiles FOR SELECT USING (auth.uid() = id);
+CREATE POLICY "Users can insert own profile" ON profiles FOR INSERT WITH CHECK (auth.uid() = id);
+CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE USING (auth.uid() = id);
+
+CREATE POLICY "Users can view own meals" ON meals FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY "Users can view own alerts" ON health_alerts FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY "Users can view own summaries" ON daily_summaries FOR ALL USING (auth.uid() = user_id);
+```
+
+4. **Configure environment variables**
+
+Create `.env.local`:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
+```
+
+Get these from: Supabase Dashboard → Settings → API
+
+5. **Run the development server**
+```bash
 npm run dev
-# or
-yarn dev
-\`\`\`
+```
 
-5. **Open your browser**
+6. **Open your browser**
 Navigate to [http://localhost:3000](http://localhost:3000)
 
-### Development Commands
+## 📱 How to Use
 
-\`\`\`bash
-# Development server with health data mocking
+### First Time Setup
+1. Click "Get Started"
+2. Create an account (email + password)
+3. Complete 2-step health profile:
+   - **Step 1**: Age, gender, activity level, primary goal
+   - **Step 2**: Medical conditions, dietary restrictions, allergies
+
+### Daily Usage
+1. **Log Food**: Click "Log Your Food"
+   - Type: "2 eggs and toast" or click 🎤 to speak
+   - Upload: Take a photo of your meal
+2. **Check Dashboard**: See your daily progress
+3. **Review Alerts**: Health warnings appear automatically
+4. **Track Progress**: View weekly nutrition trends
+
+## 🔧 Tech Stack
+
+### Frontend
+- **Next.js 14**: React framework with App Router
+- **TypeScript**: Type-safe development
+- **Tailwind CSS**: Utility-first styling
+- **Shadcn/ui**: Accessible component library
+- **Recharts**: Data visualization
+
+### Backend
+- **Supabase**: Database, authentication, and real-time features
+  - PostgreSQL database
+  - Row Level Security (RLS)
+  - Real-time subscriptions
+  - Built-in authentication
+
+### Key Dependencies
+```json
+{
+  "next": "14.2.16",
+  "react": "^18",
+  "typescript": "^5",
+  "@supabase/supabase-js": "^2.45.4",
+  "@supabase/ssr": "^0.5.2",
+  "@supabase/auth-helpers-nextjs": "^0.8.7",
+  "recharts": "latest",
+  "lucide-react": "^0.454.0"
+}
+```
+
+## 📊 Database Schema
+
+### Tables
+- **profiles**: User health information
+- **meals**: Food logs with nutrition data
+- **health_alerts**: Medical condition warnings
+- **daily_summaries**: Aggregated daily nutrition
+
+All tables use Row Level Security (RLS) to ensure users can only access their own data.
+
+## 🔐 Security & Privacy
+
+- **Supabase Authentication**: Secure email/password auth
+- **Row Level Security**: Database-level access control
+- **HTTPS Only**: All data encrypted in transit
+- **No Third-Party Tracking**: Your health data stays private
+
+## 🎨 Design Philosophy
+
+- **Focused**: Only essential features, no bloat
+- **Fast**: Optimized for quick food logging
+- **Smart**: AI does the heavy lifting
+- **Safe**: Medical awareness built-in
+- **Simple**: Clean, intuitive interface
+
+## 🧪 Development Commands
+
+```bash
+# Development server
 npm run dev
 
-# Production build with medical data validation
+# Production build
 npm run build
 
 # Start production server
 npm start
 
-# Run comprehensive test suite
-npm test
+# Lint code
+npm run lint
+```
 
-# Accessibility compliance testing
-npm run test:a11y
+## 📖 Project Structure
 
-# Security vulnerability scanning
-npm run security:scan
-
-# Medical data validation testing
-npm run test:medical
-
-# Performance testing with health scenarios
-npm run test:performance
-\`\`\`
-
-## 🧪 Testing
-
-### Test Coverage
-- **Unit Tests**: Individual component and function testing
-- **Integration Tests**: API and database interaction testing
-- **E2E Tests**: Complete user journey testing with Playwright
-- **Accessibility Tests**: WCAG 2.1 compliance verification
-- **Security Tests**: Vulnerability scanning and penetration testing
-- **Medical Scenario Tests**: Health condition-specific workflow testing
-
-### Medical Testing Scenarios
-- Emergency allergen detection workflows
-- Medication interaction alert systems
-- Critical health alert delivery
-- Offline functionality for emergency situations
-- Healthcare provider data sharing protocols
+```
+nutri-vision-ai/
+├── app/                    # Next.js app directory
+│   ├── auth/              # Authentication pages
+│   ├── dashboard/         # Main dashboard
+│   ├── onboarding/        # Health profile setup
+│   ├── profile/           # User profile
+│   └── settings/          # App settings
+├── components/            # React components
+│   ├── ui/               # Reusable UI components
+│   ├── auth-flow.tsx     # Authentication logic
+│   ├── health-onboarding.tsx  # Onboarding wizard
+│   ├── main-dashboard.tsx     # Dashboard layout
+│   └── food-input-tabs.tsx    # Food logging UI
+├── lib/                   # Utilities
+│   └── supabase.ts       # Supabase client
+└── public/               # Static assets
+```
 
 ## 🚀 Deployment
 
-### Production Requirements
-- **HIPAA-Compliant Hosting**: AWS HIPAA, Google Cloud Healthcare API, or Azure Healthcare
-- **SSL/TLS Encryption**: Minimum TLS 1.3 for all connections
-- **Database Encryption**: At-rest encryption for all health data
-- **Backup Strategy**: Encrypted, geographically distributed backups
-- **Monitoring**: 24/7 health system monitoring with alerting
-- **Compliance Auditing**: Regular security and privacy audits
-
-### Deployment Options
-
-#### Vercel (Recommended for Development)
-\`\`\`bash
+### Vercel (Recommended)
+```bash
 npm run build
 vercel --prod
-\`\`\`
+```
 
-#### Docker Production Deployment
-\`\`\`bash
-docker build -t nutri-vision-ai .
-docker run -p 3000:3000 nutri-vision-ai
-\`\`\`
+### Environment Variables for Production
+```env
+NEXT_PUBLIC_SUPABASE_URL=your-production-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-production-key
+```
 
-#### Healthcare Cloud Deployment
-- AWS HIPAA-compliant infrastructure
-- Google Cloud Healthcare APIs
-- Microsoft Azure Healthcare Bot
-- Custom FHIR server integration
+## 🗺️ Roadmap
 
-## 📈 Monitoring & Analytics
+### Current Version (v2.0)
+- ✅ Simplified 2-step onboarding
+- ✅ Voice-to-text in food logging
+- ✅ AI nutrition recommendations
+- ✅ Medical condition alerts
+- ✅ Goal-based meal suggestions
+- ✅ Supabase integration
 
-### Health Metrics
-- **System Uptime**: 99.9% availability for critical health features
-- **Response Times**: <500ms for emergency health alerts
-- **Data Accuracy**: Medical-grade nutrition data validation
-- **User Safety**: Zero tolerance for allergen detection failures
-- **Privacy Compliance**: Continuous HIPAA compliance monitoring
+### Planned Features
+- [ ] Barcode scanner for packaged foods
+- [ ] Meal history search and filtering
+- [ ] Custom food database
+- [ ] Nutrition goal customization
+- [ ] Weekly/monthly reports
+- [ ] Social sharing (optional)
 
-### Performance Monitoring
-- Real-time error tracking with Sentry
-- Performance monitoring with Web Vitals
-- User experience analytics with privacy protection
-- Medical workflow completion rates
-- Emergency feature usage statistics
+## 💡 Usage Tips
+
+### For Best Results
+- **Be Specific**: "100g grilled chicken" is better than just "chicken"
+- **Log Consistently**: Daily tracking gives better AI insights
+- **Review Alerts**: Pay attention to health warnings
+- **Update Profile**: Keep medical conditions current
+- **Check Trends**: Weekly chart shows patterns
+
+### Voice Logging Tips
+- Speak naturally: "I had scrambled eggs and toast for breakfast"
+- Include portions: "One cup of oatmeal with blueberries"
+- Works in Chrome/Edge (Web Speech API required)
 
 ## 🤝 Contributing
 
-### Medical Advisory Board
-This project is developed in consultation with:
-- Licensed Nutritionists
-- Medical Doctors specializing in Diabetes and Cardiology
-- Healthcare IT Security Experts
-- Accessibility Advocates
-- Patient Safety Representatives
-
-### Development Guidelines
-- **Medical Accuracy**: All nutrition data must be verified by medical professionals
-- **Privacy First**: No feature should compromise user health data privacy
-- **Accessibility**: Every feature must meet WCAG 2.1 AA standards
-- **Safety Critical**: Emergency features require extensive testing
-- **Documentation**: Medical features require comprehensive documentation
-
-### Code of Conduct
-We are committed to providing a safe, inclusive environment for all contributors, with special consideration for healthcare professionals and patients who contribute to this project.
+Contributions welcome! Please:
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
 
 ## 📄 License
 
-This project is licensed under the MIT License with Healthcare Addendum - see the [LICENSE.md](LICENSE.md) file for details.
-
-### Healthcare Disclaimer
-This application provides nutritional information and should not replace professional medical advice. Always consult with your healthcare provider for medical decisions. The developers and contributors are not liable for any health outcomes resulting from the use of this application.
+MIT License - see [LICENSE.md](LICENSE.md)
 
 ## 🆘 Support
 
-### Emergency Support
-For critical health-related issues with the application:
-- **Emergency Hotline**: 1-800-NUTRI-HELP
-- **24/7 Technical Support**: support@nutri-vision.ai
-- **Medical Advisory**: medical@nutri-vision.ai
+### Issues & Bugs
+- [GitHub Issues](https://github.com/yourusername/nutri-vision-ai/issues)
 
-### General Support
-- **Documentation**: [docs.nutri-vision.ai](https://docs.nutri-vision.ai)
-- **Community Forum**: [community.nutri-vision.ai](https://community.nutri-vision.ai)
-- **Bug Reports**: [GitHub Issues](https://github.com/your-org/nutri-vision-ai/issues)
-- **Feature Requests**: [Feature Portal](https://features.nutri-vision.ai)
+### Questions
+- Email: support@nutri-vision.ai
+- Documentation: [docs.nutri-vision.ai](https://docs.nutri-vision.ai)
 
-### Healthcare Provider Resources
-- **Integration Guide**: [integration.nutri-vision.ai](https://integration.nutri-vision.ai)
-- **FHIR Documentation**: [fhir.nutri-vision.ai](https://fhir.nutri-vision.ai)
-- **Clinical Studies**: [research.nutri-vision.ai](https://research.nutri-vision.ai)
-- **Provider Portal**: [providers.nutri-vision.ai](https://providers.nutri-vision.ai)
+## ⚠️ Medical Disclaimer
 
-## 🔮 Roadmap
-
-### Q1 2024
-- [ ] Advanced AI meal planning with medical conditions
-- [ ] Wearable device integration (Apple Health, Google Fit)
-- [ ] Telehealth provider video consultations
-- [ ] Advanced lab results correlation
-
-### Q2 2024
-- [ ] Clinical trial participation platform
-- [ ] Insurance integration for nutrition therapy
-- [ ] Advanced symptom tracking with ML
-- [ ] Multi-language medical terminology
-
-### Q3 2024
-- [ ] Genomic nutrition recommendations
-- [ ] Advanced medication interaction database
-- [ ] Family health sharing features
-- [ ] Clinical decision support tools
-
-### Q4 2024
-- [ ] AI-powered meal delivery integration
-- [ ] Advanced biometric monitoring
-- [ ] Healthcare system EHR integration
-- [ ] Global health data standards compliance
+This application provides nutritional information and should not replace professional medical advice. Always consult with your healthcare provider for medical decisions.
 
 ---
 
-**Built with ❤️ for better health outcomes**
+**Built with ❤️ for healthier living**
 
-*Nutri-Vision AI - Empowering individuals to make informed nutrition decisions with medical-grade precision and privacy protection.*
+*Nutri-Vision AI - Simple, smart, and safe nutrition tracking*
