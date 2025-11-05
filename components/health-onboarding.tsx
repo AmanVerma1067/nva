@@ -64,78 +64,82 @@ export function HealthOnboarding() {
   const totalSteps = 2
   const progress = (currentStep / totalSteps) * 100
 
-  const submitOnboardingData = async () => {
-    try {
-      setIsSubmitting(true)
+const submitOnboardingData = async () => {
+  try {
+    setIsSubmitting(true)
 
-      const response = await fetch("/api/user-profile", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          age: Number.parseInt(formData.age),
-          gender: formData.gender,
-          activity_level: formData.activityLevel,
-          userId: user?.id,
-        }),
-      })
+    // Save basic profile info
+    const response = await fetch("/api/user-profile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        age: Number.parseInt(formData.age),
+        gender: formData.gender,
+        activity_level: formData.activityLevel,
+        // userId removed - API gets it from the authenticated session
+      }),
+    })
 
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || "Failed to save profile")
-      }
+    if (!response.ok) {
+      const data = await response.json()
+      throw new Error(data.error || "Failed to save profile")
+    }
 
-      const {
-        data: { user: supabaseUser },
-      } = await supabase.auth.getUser()
+    // Get authenticated user for related tables
+    const {
+      data: { user: supabaseUser },
+    } = await supabase.auth.getUser()
 
-      if (supabaseUser) {
-        for (const condition of formData.medicalConditions) {
-          if (condition !== "None of the above") {
-            await supabase.from("medical_conditions").insert({
-              user_id: supabaseUser.id,
-              condition_name: condition,
-              severity: "Moderate",
-              diagnosed_year: new Date().getFullYear(),
-            })
-          }
-        }
-
-        for (const restriction of formData.dietaryRestrictions) {
-          if (restriction !== "None") {
-            await supabase.from("dietary_restrictions").insert({
-              user_id: supabaseUser.id,
-              restriction: restriction,
-            })
-          }
-        }
-
-        if (formData.allergies) {
-          await supabase.from("food_allergies").insert({
+    if (supabaseUser) {
+      // Insert medical conditions
+      for (const condition of formData.medicalConditions) {
+        if (condition !== "None of the above") {
+          await supabase.from("medical_conditions").insert({
             user_id: supabaseUser.id,
-            allergen: formData.allergies,
+            condition_name: condition,
             severity: "Moderate",
-            reaction_description: formData.allergies,
+            diagnosed_year: new Date().getFullYear(),
           })
         }
       }
 
-      toast({
-        title: "Profile Created",
-        description: "Your health profile has been saved successfully",
-      })
+      // Insert dietary restrictions
+      for (const restriction of formData.dietaryRestrictions) {
+        if (restriction !== "None") {
+          await supabase.from("dietary_restrictions").insert({
+            user_id: supabaseUser.id,
+            restriction: restriction,
+          })
+        }
+      }
 
-      router.push("/dashboard")
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to save profile",
-        variant: "destructive",
-      })
-    } finally {
-      setIsSubmitting(false)
+      // Insert allergies
+      if (formData.allergies) {
+        await supabase.from("food_allergies").insert({
+          user_id: supabaseUser.id,
+          allergen: formData.allergies,
+          severity: "Moderate",
+          reaction_description: formData.allergies,
+        })
+      }
     }
-  }
 
+    toast({
+      title: "Profile Created",
+      description: "Your health profile has been saved successfully",
+    })
+
+    router.push("/dashboard")
+  } catch (error) {
+    toast({
+      title: "Error",
+      description: error instanceof Error ? error.message : "Failed to save profile",
+      variant: "destructive",
+    })
+  } finally {
+    setIsSubmitting(false)
+  }
+}
   const handleNext = async () => {
     if (currentStep < totalSteps) {
       setCurrentStep(currentStep + 1)
