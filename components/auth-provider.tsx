@@ -37,42 +37,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setIsAuthenticated(true)
           setUser(session.user)
 
-          try {
-            const response = await fetch("/api/user-profile")
-            if (response.ok) {
-              const profile = await response.json()
-              setUserProfile(profile)
+try {
+  const response = await fetch("/api/user-profile")
+  if (response.ok) {
+    const profile = await response.json()
+    setUserProfile(profile)
 
-              // If profile exists with age/gender, user completed onboarding
-              if (profile?.age && profile?.gender) {
-                if (pathname === "/" || pathname === "/auth") {
-                  router.push("/dashboard")
-                }
-              } else {
-                // New user, redirect to onboarding
-                if (
-                  pathname === "/" ||
-                  pathname === "/dashboard" ||
-                  pathname === "/profile" ||
-                  pathname === "/settings"
-                ) {
-                  router.push("/onboarding")
-                }
-              }
-            } else {
-              // No profile found, new user
-              if (
-                pathname === "/" ||
-                pathname === "/dashboard" ||
-                pathname === "/profile" ||
-                pathname === "/settings"
-              ) {
-                router.push("/onboarding")
-              }
-            }
-          } catch (err) {
-            console.error("Profile fetch error:", err)
-          }
+    // If profile exists with age/gender, user completed onboarding
+    if (profile?.age && profile?.gender) {
+      if (pathname === "/" || pathname === "/auth") {
+        router.push("/dashboard")
+      }
+    } else {
+      // New user, redirect to onboarding
+      if (
+        pathname === "/" ||
+        pathname === "/dashboard" ||
+        pathname === "/profile" ||
+        pathname === "/settings"
+      ) {
+        router.push("/onboarding")
+      }
+    }
+  } else {
+    // No profile found, new user
+    if (
+      pathname === "/" ||
+      pathname === "/dashboard" ||
+      pathname === "/profile" ||
+      pathname === "/settings"
+    ) {
+      router.push("/onboarding")
+    }
+  }
+} catch (err) {
+  console.error("Profile fetch error:", err)
+}
+
         } else {
           setIsAuthenticated(false)
           setUser(null)
