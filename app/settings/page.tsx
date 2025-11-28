@@ -1,10 +1,14 @@
-import { profilesettings } from '@/components/user-settings'
-import { DashboardLayout } from '@/components/dashboard-layout'
+// app/settings/page.tsx
+import React from "react";
+import { DashboardLayout } from "@/components/dashboard-layout";
+import UserSettings from "@/components/user-settings";
 
 export default function SettingsPage() {
   return (
     <DashboardLayout>
-      <profilesettings />
+      <div className="py-8">
+        <UserSettings />
+      </div>
     </DashboardLayout>
-  )
+  );
 }

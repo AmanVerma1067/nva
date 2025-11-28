@@ -11,7 +11,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Shield, Bell, Download, Share2, Eye, Lock, Smartphone } from "lucide-react"
 
-export function UserSettings() {
+
+export default function UserSettings() {
   const [notifications, setNotifications] = useState({
     mealReminders: true,
     medicationAlerts: true,

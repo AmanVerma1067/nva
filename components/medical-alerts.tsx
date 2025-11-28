@@ -14,7 +14,7 @@ import { AlertTriangle, CheckCircle2 } from "lucide-react";
 
 // ⚠️ CLIENT-SIDE GEMINI API KEY (YOU ACCEPT THE RISK)
 const GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-const MODEL = "gemini-2.0-flash"; // adjust as needed
+const MODEL = "gemini-2.5-flash"; // adjust as needed
 
 // ------------- FALLBACK ALERTS -----------------
 const SAMPLE_ALERTS = [
@@ -172,7 +172,7 @@ Return ONLY JSON array.
             <AlertTriangle className="h-5 w-5 text-white bg-black" />
             Medical Alerts
           </CardTitle>
-          <CardDescription>Generated with Gemini on the client</CardDescription>
+          <CardDescription>Generated with AI on the client</CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-3">

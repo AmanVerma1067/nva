@@ -1,152 +1,207 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useEffect, useState } from "react";
 import {
   LineChart, Line, XAxis, YAxis, ResponsiveContainer,
-  PieChart, Pie, Cell, Tooltip
+  PieChart, Pie, Cell, Tooltip, CartesianGrid
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-// --- TYPES ---
+// ---------- TYPES ----------
 type FoodLog = {
+  id?: string;
   logged_at: string;
   calories?: number | string;
   protein?: number | string;
   carbs?: number | string;
   fat?: number | string;
-  nutrients?: { [key: string]: any };
+  nutrients?: { [k: string]: any };
+  description?: string;
   [k: string]: any;
 };
 
-// --- SAFE MATH PARSER (Keeps calculations correct) ---
+// ---------- HELPERS ----------
 const cleanNum = (val: any): number => {
-  if (val === null || val === undefined) return 0;
-  if (typeof val === 'number') return Number.isFinite(val) ? val : 0;
-  if (typeof val === 'string') {
-    const cleanString = val.replace(/[^0-9.]/g, ''); 
-    const parsed = parseFloat(cleanString);
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
-  if (typeof val === 'object') return cleanNum(val.value || 0);
+  if (typeof val === "number") return Number.isFinite(val) ? val : 0;
+  if (typeof val === "string") return parseFloat(val) || 0;
+  if (typeof val === "object") return cleanNum(val.value || val.amount);
   return 0;
 };
 
-export function NutritionChart({ foodLogs = [] }: { foodLogs: FoodLog[] }) {
-  
-  const { weeklyChartData, todayStats, pieData, hasTodayData } = useMemo(() => {
-    const now = new Date();
-    // Local date string YYYY-MM-DD
-    const localTodayKey = new Date(now.getTime() - (now.getTimezoneOffset() * 60000))
-      .toISOString().split("T")[0];
+function extractMacros(log: FoodLog) {
+  const p = cleanNum(log.nutrients?.protein ?? log.protein);
+  const c = cleanNum(log.nutrients?.carbs ?? log.carbs);
+  const f = cleanNum(log.nutrients?.fat ?? log.fat);
+  let cal = cleanNum(log.nutrients?.calories ?? log.calories);
+  if (!cal) cal = Math.round(p * 4 + c * 4 + f * 9);
+  return { p, c, f, cal };
+}
 
-    // 1. Setup last 7 days buckets
-    const daysMap = new Map<string, { label: string; calories: number }>();
+// ---------- MOCK DATA GENERATOR ----------
+const generateMockData = (): FoodLog[] => {
+  const data: FoodLog[] = [];
+  const now = new Date();
+  const subDays = (d: Date, n: number) => {
+    const x = new Date(d); x.setDate(x.getDate() - n); return x.toISOString();
+  };
+
+  // Today's Meals
+  data.push(
+    { id: "1", logged_at: subDays(now, 0), description: "Oatmeal & Berries", protein: 12, carbs: 45, fat: 6, calories: 320 },
+    { id: "2", logged_at: subDays(now, 0), description: "Chicken Caesar", protein: 40, carbs: 15, fat: 12, calories: 450 },
+    { id: "3", logged_at: subDays(now, 0), description: "Steak & Potatoes", protein: 55, carbs: 50, fat: 25, calories: 750 }
+  );
+
+  // History (Smooth Curve Data)
+  const history = [2100, 1850, 2300, 1950, 2150, 1700, 2000]; 
+  for (let i = 1; i <= 7; i++) {
+    data.push({ 
+        logged_at: subDays(now, i), 
+        description: "History", 
+        calories: history[i-1] 
+    });
+  }
+  return data;
+};
+
+// ---------- COMPONENT ----------
+export default function NutritionDashboard({ foodLogs = [] }: { foodLogs?: FoodLog[] }) {
+  
+  // 1. Prepare Data
+  const { lineData, pieData, todayTotal, mealList } = useMemo(() => {
+    const logs = foodLogs.length ? foodLogs : generateMockData();
+    const now = new Date();
+    const todayKey = now.toLocaleDateString('en-CA'); // YYYY-MM-DD
+
+    // Maps
+    const historyMap = new Map();
+    let tP = 0, tC = 0, tF = 0, tCal = 0;
+    const meals: any[] = [];
+
+    // Init last 7 days in map to ensure continuous line
     for (let i = 6; i >= 0; i--) {
-      const d = new Date(now);
-      d.setDate(d.getDate() - i);
-      const k = new Date(d.getTime() - (d.getTimezoneOffset() * 60000))
-        .toISOString().split("T")[0];
-      daysMap.set(k, { 
-        label: d.toLocaleDateString("en-US", { weekday: "short" }), 
-        calories: 0 
-      });
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        historyMap.set(d.toLocaleDateString('en-CA'), {
+            label: d.toLocaleDateString('en-US', { weekday: 'short' }),
+            calories: 0,
+            dateObj: d
+        });
     }
 
-    // 2. Fill Buckets
-    let todayP = 0, todayC = 0, todayF = 0, todayCals = 0;
+    logs.forEach(log => {
+        const { p, c, f, cal } = extractMacros(log);
+        const date = new Date(log.logged_at);
+        const key = date.toLocaleDateString('en-CA');
 
-    foodLogs.forEach((log) => {
-      if (!log.logged_at) return;
-      const d = new Date(log.logged_at);
-      const k = new Date(d.getTime() - (d.getTimezoneOffset() * 60000))
-        .toISOString().split("T")[0];
+        // Add to history
+        if (historyMap.has(key)) {
+            historyMap.get(key).calories += cal;
+        }
 
-      const p = cleanNum(log.protein || log.nutrients?.protein);
-      const c = cleanNum(log.carbs || log.nutrients?.carbs);
-      const f = cleanNum(log.fat || log.nutrients?.fat);
-      let cal = cleanNum(log.calories || log.nutrients?.calories);
-      
-      // Auto-calculate calories if missing
-      if (cal === 0) cal = (p * 4) + (c * 4) + (f * 9);
-
-      if (daysMap.has(k)) {
-        daysMap.get(k)!.calories += cal;
-      }
-
-      if (k === localTodayKey) {
-        todayCals += cal;
-        todayP += p;
-        todayC += c;
-        todayF += f;
-      }
+        // Add to Today
+        if (key === todayKey) {
+            tP += p; tC += c; tF += f; tCal += cal;
+            meals.push({ label: log.description || "Meal", cal, p, c, f });
+        }
     });
 
-    // 3. Prepare Arrays
-    const weeklyChartData = Array.from(daysMap.values()).map(d => ({
-      day: d.label,
-      calories: Math.round(d.calories)
-    }));
+    // Format Line Data (Sorted by date for continuous line)
+    const lineData = Array.from(historyMap.values())
+        .sort((a,b) => a.dateObj - b.dateObj)
+        .map(x => ({ day: x.label, calories: Math.round(x.calories) }));
 
-    // Pie Data: Calories from Macros
-    const pCal = todayP * 4;
-    const cCal = todayC * 4;
-    const fCal = todayF * 9;
-    const totalMacroCals = pCal + cCal + fCal;
-    const hasTodayData = totalMacroCals > 0;
+    // Format Pie Data
+    const pieData = (tP+tC+tF > 0) ? [
+        { name: "Protein", val: Math.round(tP), color: "#3b82f6" }, // Blue
+        { name: "Carbs", val: Math.round(tC), color: "#f97316" },   // Orange
+        { name: "Fat", val: Math.round(tF), color: "#ec4899" },     // Pink
+    ] : [{ name: "Empty", val: 1, color: "#e2e8f0" }];
 
-    const pieData = hasTodayData 
-      ? [
-          { name: "Protein", value: pCal, grams: Math.round(todayP), color: "#10B981" }, // Green
-          { name: "Carbs", value: cCal, grams: Math.round(todayC), color: "#F59E0B" },   // Orange
-          { name: "Fat", value: fCal, grams: Math.round(todayF), color: "#8B5CF6" },     // Purple
-        ]
-      : [{ name: "No Data", value: 1, grams: 0, color: "#cbd5e1" }]; // Grey
-
-    return {
-      weeklyChartData,
-      todayStats: { calories: Math.round(todayCals), p: Math.round(todayP), c: Math.round(todayC), f: Math.round(todayF) },
-      pieData,
-      hasTodayData
+    return { 
+        lineData, 
+        pieData, 
+        todayTotal: { cal: Math.round(tCal), mass: Math.round(tP+tC+tF) }, 
+        mealList: meals 
     };
   }, [foodLogs]);
 
-  if (!foodLogs) return null;
+  // 2. Animate Numbers
+  const [animatedCal, setAnimatedCal] = useState(0);
+  useEffect(() => {
+    let start = 0;
+    const end = todayTotal.cal;
+    const duration = 1000;
+    const startTime = performance.now();
+
+    const animate = (currentTime: number) => {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        // Ease out quart
+        const ease = 1 - Math.pow(1 - progress, 4); 
+        
+        setAnimatedCal(Math.round(start + (end - start) * ease));
+
+        if (progress < 1) requestAnimationFrame(animate);
+    };
+    requestAnimationFrame(animate);
+  }, [todayTotal.cal]);
 
   return (
-    <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-6 p-1">
+    <div className="w-full max-w-5xl mx-auto p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
       
-      {/* --- CHART 1: LINE CHART --- */}
-      <Card className="shadow-md">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg">Weekly Trend</CardTitle>
+      {/* --- 1. CONTINUOUS LINE CHART --- */}
+      <Card className="shadow-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+        <CardHeader>
+          <CardTitle className="text-lg font-bold text-gray-800 dark:text-gray-100">
+            Weekly Trend
+          </CardTitle>
+          <p className="text-sm text-gray-500">Last 7 Days</p>
         </CardHeader>
         <CardContent>
-          {/* EXPLICIT HEIGHT STYLE IS CRITICAL HERE */}
-          <div style={{ width: '100%', height: '300px' }}>
+          <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={weeklyChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <LineChart data={lineData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorLine" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor="#8b5cf6" />
+                    <stop offset="100%" stopColor="#3b82f6" />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
                 <XAxis 
-                  dataKey="day" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fill: '#64748b', fontSize: 12 }} 
-                  dy={10}
+                    dataKey="day" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{fill: '#6b7280', fontSize: 12}} 
+                    dy={10}
                 />
                 <YAxis 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fill: '#64748b', fontSize: 12 }} 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{fill: '#6b7280', fontSize: 12}} 
                 />
                 <Tooltip 
-                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                    contentStyle={{ 
+                        backgroundColor: '#1f2937', 
+                        borderColor: '#374151', 
+                        borderRadius: '8px',
+                        color: '#f3f4f6'
+                    }}
+                    itemStyle={{ color: '#fff' }}
+                    cursor={{ stroke: '#9ca3af', strokeWidth: 1, strokeDasharray: '5 5' }}
                 />
+                {/* type="monotone" creates the smooth continuous curve 
+                   stroke="url(#...)" gives it the gradient color
+                */}
                 <Line 
-                  type="monotone" 
-                  dataKey="calories" 
-                  stroke="#3b82f6" 
-                  strokeWidth={3} 
-                  dot={{ r: 4, fill: "#3b82f6", strokeWidth: 2, stroke: "#fff" }} 
-                  activeDot={{ r: 7 }}
+                    type="monotone" 
+                    dataKey="calories" 
+                    stroke="url(#colorLine)" 
+                    strokeWidth={4}
+                    dot={{ r: 4, fill: "#fff", strokeWidth: 2, stroke: "#6366f1" }}
+                    activeDot={{ r: 8, fill: "#6366f1", stroke: "#fff", strokeWidth: 2 }}
+                    animationDuration={2000}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -154,70 +209,81 @@ export function NutritionChart({ foodLogs = [] }: { foodLogs: FoodLog[] }) {
         </CardContent>
       </Card>
 
-      {/* --- CHART 2: PIE CHART --- */}
-      <Card className="shadow-md">
-        <CardHeader className="pb-2 flex flex-row items-center justify-between">
-          <CardTitle className="text-lg">Today's Macros</CardTitle>
+      {/* --- 2. PIE CHART & MACROS --- */}
+      <Card className="shadow-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 flex flex-col">
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <div>
+            <CardTitle className="text-lg font-bold text-gray-800 dark:text-gray-100">Today's Macros</CardTitle>
+            <p className="text-sm text-gray-500">Distribution</p>
+          </div>
           <div className="text-right">
-             <div className="text-2xl font-bold">{todayStats.calories}</div>
-             <div className="text-xs text-muted-foreground">Total kcal</div>
+            <div className="text-2xl font-black text-gray-900 dark:text-white">{animatedCal}</div>
+            <div className="text-xs uppercase font-bold text-gray-400">kcal</div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="flex flex-col items-center">
-            
-            {/* EXPLICIT HEIGHT STYLE IS CRITICAL HERE */}
-            <div style={{ width: '100%', height: '220px', position: 'relative' }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={hasTodayData ? 5 : 0}
-                    dataKey="value"
-                    stroke="none"
-                  >
-                    {pieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-              
-              {/* Center Text Overlay */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                 <span className="text-2xl font-bold text-slate-700 dark:text-slate-200">
-                    {todayStats.p + todayStats.c + todayStats.f}g
-                 </span>
-                 <span className="text-xs text-slate-400">Total Mass</span>
-              </div>
+        
+        <CardContent className="flex-1 flex flex-col">
+            {/* The Pie */}
+            <div className="h-[220px] w-full relative">
+                <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                        <Pie
+                            data={pieData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={65}
+                            outerRadius={85}
+                            paddingAngle={5}
+                            dataKey="val"
+                            stroke="none"
+                            animationDuration={1500}
+                        >
+                            {pieData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                        </Pie>
+                        <Tooltip 
+                            formatter={(val: number) => `${val}g`}
+                            contentStyle={{ borderRadius: '8px', backgroundColor: '#1f2937', color: '#fff', border: 'none' }}
+                        />
+                    </PieChart>
+                </ResponsiveContainer>
+                
+                {/* Center Text Overlay */}
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="text-3xl font-bold text-gray-800 dark:text-white">
+                        {todayTotal.mass}
+                    </span>
+                    <span className="text-xs text-gray-400 uppercase font-bold">Total Grams</span>
+                </div>
             </div>
 
-            {/* Legend */}
-            <div className="w-full mt-4 space-y-2">
-              {pieData.map((entry) => {
-                if (entry.name === "No Data") return <div key="nd" className="text-center text-sm text-slate-400">No logs today</div>;
-                return (
-                  <div key={entry.name} className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }} />
-                      <span className="font-medium text-slate-600 dark:text-slate-300">{entry.name}</span>
+            {/* Custom Legend / Grid */}
+            <div className="grid grid-cols-3 gap-2 mt-4">
+                {pieData.map(d => d.name !== "Empty" && (
+                    <div key={d.name} className="flex flex-col items-center p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                        <span className="w-3 h-3 rounded-full mb-1" style={{ backgroundColor: d.color }}></span>
+                        <span className="text-xs font-semibold text-gray-500">{d.name}</span>
+                        <span className="text-lg font-bold text-gray-800 dark:text-white">{d.val}g</span>
                     </div>
-                    <span className="font-bold">{entry.grams}g</span>
-                  </div>
-                );
-              })}
+                ))}
             </div>
 
-          </div>
+            {/* Meal List (Scrollable if many) */}
+            <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-800 flex-1 overflow-auto max-h-[150px]">
+                <p className="text-xs font-bold text-gray-400 uppercase mb-2">Logged Items</p>
+                {mealList.map((m, i) => (
+                    <div key={i} className="flex justify-between items-center py-2 border-b border-gray-50 dark:border-gray-800/50 last:border-0">
+                        <div>
+                            <div className="text-sm font-medium text-gray-700 dark:text-gray-200">{m.label}</div>
+                            <div className="text-xs text-gray-400">{m.p}p • {m.c}c • {m.f}f</div>
+                        </div>
+                        <div className="text-sm font-bold text-gray-900 dark:text-white">{m.cal}</div>
+                    </div>
+                ))}
+            </div>
         </CardContent>
       </Card>
     </div>
   );
 }
-
-export default NutritionChart;
