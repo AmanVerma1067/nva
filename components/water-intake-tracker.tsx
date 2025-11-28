@@ -1,264 +1,437 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Progress } from '@/components/ui/progress'
-import { Droplet, Plus, Minus, RotateCcw } from 'lucide-react'
-import { useToast } from '@/hooks/use-toast'
+import React, { useEffect, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { Droplet, Plus, Minus, RotateCcw, Undo } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface WaterIntakeProps {
-  userId?: string
-  initialGlasses?: number
-  goal?: number
+  userId?: string;
+  initialGlasses?: number;
+  goal?: number;
 }
 
+type LastAction = { type: "add" | "remove" | "reset"; prevValue: number; timestamp: number } | null;
+
+const SAVE_DEBOUNCE_MS = 900;
+const UNDO_TIMEOUT_MS = 6000;
+const STREAK_KEY = "nv_water_streak_v1"; // localStorage key for streak tracking
+
 export function WaterIntakeTracker({ userId, initialGlasses = 0, goal = 8 }: WaterIntakeProps) {
-  const { toast } = useToast()
-  const [waterGlasses, setWaterGlasses] = useState(initialGlasses)
-  const [isAnimating, setIsAnimating] = useState(false)
-  const [ripples, setRipples] = useState<number[]>([])
+  const { toast } = useToast();
+  const [waterGlasses, setWaterGlasses] = useState<number>(initialGlasses);
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [lastAction, setLastAction] = useState<LastAction>(null);
+  const [streakDays, setStreakDays] = useState<number>(0);
+  const saveTimer = useRef<number | null>(null);
+  const undoTimer = useRef<number | null>(null);
+  const prevValueRef = useRef<number>(initialGlasses);
+  const mountedRef = useRef(false);
 
-  // Load water intake from database on mount
-  useEffect(() => {
-    loadWaterIntake()
-  }, [userId])
+  // Helper: persist to server (debounced)
+  const scheduleSave = (value: number) => {
+    if (saveTimer.current) window.clearTimeout(saveTimer.current);
+    saveTimer.current = window.setTimeout(() => {
+      persistWater(value);
+    }, SAVE_DEBOUNCE_MS) as unknown as number;
+  };
 
-  // Save to database whenever water glasses change
-  useEffect(() => {
-    if (waterGlasses !== initialGlasses) {
-      saveWaterIntake()
-    }
-  }, [waterGlasses])
-
-  const loadWaterIntake = async () => {
+  // Optimistic save with rollback on error
+  const persistWater = async (value: number) => {
+    setSaving(true);
     try {
-      const today = new Date().toISOString().split('T')[0]
-      const response = await fetch(`/api/daily-nutrition?date=${today}`)
-      
-      if (response.ok) {
-        const data = await response.json()
-        setWaterGlasses(data.water_intake_glasses || 0)
-      }
-    } catch (error) {
-      console.error('Failed to load water intake:', error)
+      const today = new Date().toISOString().split("T")[0];
+      const res = await fetch("/api/water-intake", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: today, glasses: value, userId: userId ?? undefined }),
+      });
+      if (!res.ok) throw new Error("Save failed");
+      setSaving(false);
+    } catch (err) {
+      console.error("Persist water failed:", err);
+      setSaving(false);
+      // rollback to previous known value
+      setWaterGlasses(prevValueRef.current);
+      toast({
+        title: "Save failed",
+        description: "Couldn't save your water intake. Reverted to last known value.",
+        variant: "destructive",
+      });
     }
-  }
+  };
 
-  const saveWaterIntake = async () => {
+  // Load current water intake from server on mount
+  useEffect(() => {
+    mountedRef.current = true;
+    const load = async () => {
+      try {
+        const today = new Date().toISOString().split("T")[0];
+        const res = await fetch(`/api/daily-nutrition?date=${today}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (mountedRef.current) {
+          setWaterGlasses(data.water_intake_glasses ?? initialGlasses);
+          prevValueRef.current = data.water_intake_glasses ?? initialGlasses;
+        }
+      } catch (err) {
+        console.warn("Failed to load water intake:", err);
+      }
+    };
+    load();
+    // restore streak
+    const saved = window.localStorage.getItem(STREAK_KEY);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        const lastDate = parsed.lastDate;
+        const streak = parsed.streak || 0;
+        const todayStr = new Date().toISOString().split("T")[0];
+        if (lastDate === todayStr) {
+          setStreakDays(streak);
+        } else {
+          setStreakDays(streak);
+        }
+      } catch {
+        setStreakDays(0);
+      }
+    }
+
+    // keyboard shortcuts: + and - to add/remove
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "+" || e.key === "=") handleAdd();
+      if (e.key === "-" || e.key === "_") handleRemove();
+    };
+    window.addEventListener("keydown", onKey);
+
+    return () => {
+      mountedRef.current = false;
+      window.removeEventListener("keydown", onKey);
+      if (saveTimer.current) window.clearTimeout(saveTimer.current);
+      if (undoTimer.current) window.clearTimeout(undoTimer.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // update streak localStorage when goal reached
+  const recordStreakIfNeeded = (value: number) => {
     try {
-      const today = new Date().toISOString().split('T')[0]
-      const response = await fetch('/api/water-intake', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          date: today,
-          glasses: waterGlasses,
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to save water intake')
+      const today = new Date().toISOString().split("T")[0];
+      const raw = window.localStorage.getItem(STREAK_KEY);
+      let data = { lastDate: "", streak: 0 } as { lastDate: string; streak: number };
+      if (raw) data = JSON.parse(raw);
+      // If already reached today, do nothing
+      if (data.lastDate === today) return;
+      if (value >= goal) {
+        // if previous day was yesterday => increment streak, else reset to 1
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = yesterday.toISOString().split("T")[0];
+        if (data.lastDate === yesterdayStr) data.streak = (data.streak || 0) + 1;
+        else data.streak = 1;
+        data.lastDate = today;
+        window.localStorage.setItem(STREAK_KEY, JSON.stringify(data));
+        setStreakDays(data.streak);
+        toast({
+          title: "Hydration Streak",
+          description: `You've kept your streak for ${data.streak} day${data.streak !== 1 ? "s" : ""}! Keep it going!`,
+        });
       }
-    } catch (error) {
-      console.error('Failed to save water intake:', error)
+    } catch (err) {
+      // ignore storage issues
+      console.warn("streak save failed", err);
     }
-  }
+  };
 
-  const addWater = () => {
-    if (waterGlasses < goal + 4) {
-      setWaterGlasses(prev => prev + 1)
-      triggerAnimation()
-      
-      const newGlasses = waterGlasses + 1
-      if (newGlasses === goal) {
-        toast({
-          title: "🎉 Goal Reached!",
-          description: `Great job! You've reached your daily water goal of ${goal} glasses!`,
-        })
-      } else if (newGlasses < goal) {
-        toast({
-          title: "💧 Water Added",
-          description: `${newGlasses}/${goal} glasses today. Keep it up!`,
-        })
-      } else {
-        toast({
-          title: "💪 Excellent Hydration!",
-          description: `You're exceeding your goal! ${newGlasses}/${goal} glasses.`,
-        })
-      }
-    }
-  }
+  // UI helpers
+  const percentage = Math.min((waterGlasses / goal) * 100, 100);
+  const isGoalReached = waterGlasses >= goal;
 
-  const removeWater = () => {
-    if (waterGlasses > 0) {
-      setWaterGlasses(prev => prev - 1)
-      triggerAnimation()
-    }
-  }
+  // Core actions (optimistic)
+  const doAction = (newValue: number, actionType: LastAction["type"]) => {
+    const prev = prevValueRef.current;
+    prevValueRef.current = newValue;
+    setWaterGlasses(newValue);
+    setIsAnimating(true);
+    window.setTimeout(() => setIsAnimating(false), 700);
 
-  const resetWater = () => {
-    setWaterGlasses(0)
+    // store last action for undo
+    const action: LastAction = { type: actionType, prevValue: prev, timestamp: Date.now() };
+    setLastAction(action);
+
+    // schedule persistence
+    scheduleSave(newValue);
+
+    // show undo toast
+    if (undoTimer.current) window.clearTimeout(undoTimer.current);
+    undoTimer.current = window.setTimeout(() => {
+      setLastAction(null);
+      // record streak only after undo window passes
+      recordStreakIfNeeded(newValue);
+      undoTimer.current = null;
+    }, UNDO_TIMEOUT_MS) as unknown as number;
+
+    // Create a React element for the toast action (Undo button)
+    const undoButton = (
+      <button
+        onClick={() => {
+          // revert
+          if (!action) return;
+          if (undoTimer.current) {
+            window.clearTimeout(undoTimer.current);
+            undoTimer.current = null;
+          }
+          setWaterGlasses(action.prevValue);
+          prevValueRef.current = action.prevValue;
+          setLastAction(null);
+          scheduleSave(action.prevValue);
+          toast({
+            title: "Undone",
+            description: `Reverted to ${action.prevValue} glasses.`,
+          });
+        }}
+        className="inline-flex items-center gap-2 rounded px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200"
+      >
+        Undo
+      </button>
+    );
+
     toast({
-      title: "Reset Complete",
-      description: "Water intake has been reset to 0.",
-    })
-  }
+      title: actionType === "add" ? `Added water` : actionType === "remove" ? `Removed water` : "Reset",
+      description:
+        actionType === "add"
+          ? `${newValue}/${goal} glasses`
+          : actionType === "remove"
+          ? `${newValue}/${goal} glasses`
+          : "All water reset",
+      // pass a React element (button) as the action so toast can render it safely
+      action: undoButton as unknown as React.ReactNode,
+    });
+  };
 
-  const triggerAnimation = () => {
-    setIsAnimating(true)
-    
-    // Add ripple effect
-    const newRipple = Date.now()
-    setRipples(prev => [...prev, newRipple])
-    
-    setTimeout(() => {
-      setIsAnimating(false)
-    }, 600)
+  const handleAdd = () => {
+    // limit: allow some extra above goal (goal + 6)
+    const max = goal + 6;
+    if (waterGlasses >= max) {
+      toast({ title: "Limit reached", description: `You've reached the maximum tracked intake (${max}).` });
+      return;
+    }
+    doAction(waterGlasses + 1, "add");
+  };
 
-    // Remove ripple after animation
-    setTimeout(() => {
-      setRipples(prev => prev.filter(r => r !== newRipple))
-    }, 800)
-  }
+  const handleRemove = () => {
+    if (waterGlasses <= 0) {
+      toast({ title: "Nothing to remove", description: "Water glasses already at 0." });
+      return;
+    }
+    doAction(waterGlasses - 1, "remove");
+  };
 
-  const percentage = Math.min((waterGlasses / goal) * 100, 100)
-  const isGoalReached = waterGlasses >= goal
+  const handleReset = () => {
+    doAction(0, "reset");
+  };
+
+  // explicit save button (if user wants to force save)
+  const handleForceSave = () => {
+    if (saveTimer.current) {
+      window.clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
+    persistWater(waterGlasses);
+  };
+
+  // Small visual components
+  const Bottle = ({ fill }: { fill: number }) => {
+    // fill 0..100
+    const clamped = Math.max(0, Math.min(100, fill));
+    const waveY = 100 - clamped; // percent for transform
+    return (
+      <div className="relative w-24 h-40 md:w-28 md:h-44 flex-shrink-0">
+        <div className="absolute inset-0 flex items-end justify-center pointer-events-none">
+          <div className="w-16 md:w-18 h-[86%] relative rounded-2xl overflow-hidden border-2 border-white/30 shadow-inner bg-white/5 dark:bg-black/20">
+            {/* animated liquid */}
+            <motion.div
+              aria-hidden
+              initial={{ y: "100%" }}
+              animate={{ y: `${waveY}%` }}
+              transition={{ ease: "easeInOut", duration: 0.8 }}
+              className={`absolute left-0 right-0 bottom-0 top-0 bg-gradient-to-t from-blue-500/90 to-blue-300/70`}
+              style={{ transformOrigin: "center bottom" }}
+            >
+              {/* bubbles */}
+              <AnimatePresence>
+                {Array.from({ length: Math.max(2, Math.floor(clamped / 20)) }).map((_, i) => (
+                  <motion.span
+                    key={i}
+                    initial={{ opacity: 0, y: 10, scale: 0.6 }}
+                    animate={{ opacity: 0.9, y: -10 - (i % 3) * 8, scale: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ repeat: Infinity, repeatType: "reverse", duration: 3 + i * 0.6, delay: i * 0.2 }}
+                    className="absolute rounded-full bg-white/60"
+                    style={{ width: 8, height: 8, bottom: `${10 + i * 6}%`, left: `${10 + i * 12}%` }}
+                  />
+                ))}
+              </AnimatePresence>
+            </motion.div>
+          </div>
+        </div>
+        {/* Bottle outline / label */}
+        <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 text-xs text-muted-foreground w-full text-center">
+          <div className="text-[11px]">
+            {waterGlasses}/{goal} glasses
+          </div>
+          <div className="text-[10px] text-gray-400">Goal: {goal}</div>
+        </div>
+      </div>
+    );
+  };
 
   return (
-    <Card className={`border-2 transition-all duration-300 ${
-      isGoalReached 
-        ? 'border-green-300 bg-green-50 dark:bg-green-900/10' 
-        : 'border-blue-300 bg-blue-50 dark:bg-blue-900/10'
-    }`}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">Water Intake</CardTitle>
-        <div className="relative">
-          <Droplet 
-            className={`h-5 w-5 transition-all duration-300 ${
-              isGoalReached 
-                ? 'text-green-600' 
-                : 'text-blue-600'
-            } ${isAnimating ? 'scale-125' : 'scale-100'}`}
-          />
-          {ripples.map((ripple) => (
-            <div
-              key={ripple}
-              className="absolute inset-0 rounded-full border-2 border-blue-400 animate-ping"
-              style={{ animationDuration: '0.8s' }}
-            />
-          ))}
+    <Card
+      className={`relative overflow-hidden transition-shadow duration-300 rounded-2xl ${
+        isGoalReached ? "ring-2 ring-green-300/60" : "ring-0"
+      }`}
+    >
+      <CardHeader className="flex items-center justify-between pb-2">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Droplet className={`h-5 w-5 ${isGoalReached ? "text-green-600" : "text-blue-600"}`} />
+            <CardTitle className="text-sm font-semibold">Water Intake</CardTitle>
+          </div>
+          <div className="ml-2 text-xs text-muted-foreground hidden md:block">Stay hydrated — small steps matter</div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="text-xs text-muted-foreground text-right">
+            <div className="font-semibold">{Math.round(percentage)}%</div>
+            <div className="text-[11px] text-gray-400">{streakDays ? `Streak: ${streakDays}d` : "No streak"}</div>
+          </div>
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {/* Water Count Display */}
-          <div className="text-center">
-            <div className="text-5xl font-bold text-blue-600 dark:text-blue-400 transition-all duration-300">
-              {waterGlasses}
+
+      <CardContent className="flex flex-col md:flex-row gap-6 items-center md:items-start">
+        {/* Left: Bottle visual */}
+        <div className="flex items-center justify-center md:justify-start">
+          <Bottle fill={percentage} />
+        </div>
+
+        {/* Right: Controls & progress */}
+        <div className="flex-1 w-full">
+          <div className="flex items-center justify-between gap-4 mb-4">
+            <div className="flex-1 pr-4">
+              <Progress value={percentage} className="h-3 rounded-full" />
+              <div className="flex justify-between text-xs text-muted-foreground mt-2">
+                <span>{waterGlasses} glasses</span>
+                <span>{Math.round(percentage)}% of {goal}</span>
+              </div>
             </div>
-            <p className="text-sm text-muted-foreground mt-1">
-              of {goal} glasses
-            </p>
+
+            {/* BUTTONS: fixed outer box, animate inner icon only (no layout shift) */}
+            <div className="flex flex-col items-center gap-2 overflow-hidden">
+              {/* Add */}
+              <button
+                onClick={handleAdd}
+                aria-label="Add glass"
+                title="Add glass"
+                className="flex-shrink-0 transform-gpu will-change-transform inline-flex items-center justify-center rounded-full bg-blue-600 hover:bg-blue-700 text-white w-10 h-10 shadow"
+                style={{ position: "relative", overflow: "hidden" }}
+              >
+                <motion.span
+                  initial={{ scale: 1 }}
+                  whileTap={{ scale: 0.9 }}
+                  transition={{ type: "spring", stiffness: 700, damping: 30 }}
+                  className="inline-flex items-center justify-center"
+                  style={{ display: "inline-flex" }}
+                >
+                  <Plus className="h-4 w-4" />
+                </motion.span>
+              </button>
+
+              {/* Remove */}
+              <button
+                onClick={handleRemove}
+                aria-label="Remove glass"
+                title="Remove glass"
+                className="flex-shrink-0 transform-gpu will-change-transform inline-flex items-center justify-center rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 w-10 h-10 shadow-sm"
+                style={{ position: "relative", overflow: "hidden" }}
+              >
+                <motion.span
+                  initial={{ scale: 1 }}
+                  whileTap={{ scale: 0.9 }}
+                  transition={{ type: "spring", stiffness: 700, damping: 30 }}
+                  className="inline-flex items-center justify-center"
+                  style={{ display: "inline-flex" }}
+                >
+                  <Minus className="h-4 w-4 text-gray-700" />
+                </motion.span>
+              </button>
+            </div>
           </div>
 
-          {/* Progress Bar */}
-          <div className="space-y-2">
-            <Progress 
-              value={percentage} 
-              className={`h-3 transition-all duration-500 ${
-                isAnimating ? 'scale-105' : 'scale-100'
-              }`}
-            />
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>{Math.round(percentage)}% of goal</span>
-              {waterGlasses > goal && (
-                <span className="text-green-600 font-medium">
-                  +{waterGlasses - goal} bonus!
-                </span>
+          <div className="flex gap-2 items-center">
+            <Button variant="ghost" onClick={handleReset} className="flex items-center gap-2">
+              <RotateCcw className="h-4 w-4" /> Reset
+            </Button>
+
+            <Button variant="outline" onClick={handleForceSave} className="flex items-center gap-2">
+              {saving ? "Saving..." : "Save Now"}
+            </Button>
+
+            <AnimatePresence>
+              {lastAction && (
+                <motion.button
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 6 }}
+                  onClick={() => {
+                    // manual undo via small button
+                    setWaterGlasses(lastAction.prevValue);
+                    prevValueRef.current = lastAction.prevValue;
+                    scheduleSave(lastAction.prevValue);
+                    setLastAction(null);
+                    toast({ title: "Undone", description: `Reverted to ${lastAction.prevValue} glasses.` });
+                    if (undoTimer.current) {
+                      window.clearTimeout(undoTimer.current);
+                      undoTimer.current = null;
+                    }
+                  }}
+                  className="ml-auto text-white bg-black border-white inline-flex items-center gap-2 rounded-lg px-3 py-1 bg-gray-100 hover:bg-gray-200 text-sm"
+                >
+                  <Undo className="h-4 w-4" /> Undo
+                </motion.button>
               )}
-            </div>
+            </AnimatePresence>
           </div>
 
-          {/* Visual Water Glasses */}
-          <div className="grid grid-cols-8 gap-1 py-2">
-            {Array.from({ length: Math.max(goal, waterGlasses) }).map((_, index) => (
-              <div
-                key={index}
-                className={`h-8 rounded transition-all duration-300 ${
-                  index < waterGlasses
-                    ? isGoalReached && index >= goal
-                      ? 'bg-green-400 animate-pulse'
-                      : 'bg-blue-500'
-                    : 'bg-gray-200 dark:bg-gray-700'
-                }`}
-                style={{
-                  transitionDelay: `${index * 30}ms`
-                }}
-              />
-            ))}
+          {/* Motivational / contextual message */}
+          <div className="mt-4 text-sm">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={Math.min(waterGlasses, goal)}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.28 }}
+                className={`text-xs ${isGoalReached ? "text-green-700 font-medium" : "text-gray-600"}`}
+              >
+                {isGoalReached
+                  ? "🎉 Goal hit — excellent hydration!"
+                  : waterGlasses === 0
+                  ? "💧 Start drinking water — small sips count."
+                  : waterGlasses < goal / 2
+                  ? "🌊 Good start — keep sipping throughout the day."
+                  : "💪 Halfway or more — you're on track!"}
+              </motion.div>
+            </AnimatePresence>
           </div>
-
-          {/* Control Buttons */}
-          <div className="flex gap-2">
-            <Button
-              onClick={removeWater}
-              disabled={waterGlasses === 0}
-              variant="outline"
-              size="sm"
-              className="flex-1"
-            >
-              <Minus className="h-4 w-4 mr-1" />
-              Remove
-            </Button>
-            
-            <Button
-              onClick={addWater}
-              disabled={waterGlasses >= goal + 4}
-              className="flex-1 bg-blue-600 hover:bg-blue-700"
-              size="sm"
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              Add Glass
-            </Button>
-
-            <Button
-              onClick={resetWater}
-              variant="ghost"
-              size="sm"
-            >
-              <RotateCcw className="h-4 w-4" />
-            </Button>
-          </div>
-
-          {/* Motivational Messages */}
-          {waterGlasses === 0 && (
-            <div className="text-center text-xs text-gray-500 dark:text-gray-400 pt-2">
-              💧 Start tracking your water intake today!
-            </div>
-          )}
-          
-          {waterGlasses > 0 && waterGlasses < goal / 2 && (
-            <div className="text-center text-xs text-blue-600 dark:text-blue-400 pt-2">
-              🌊 Good start! Keep drinking water throughout the day.
-            </div>
-          )}
-          
-          {waterGlasses >= goal / 2 && waterGlasses < goal && (
-            <div className="text-center text-xs text-blue-600 dark:text-blue-400 pt-2">
-              💪 Halfway there! You're doing great!
-            </div>
-          )}
-          
-          {isGoalReached && (
-            <div className="text-center text-xs text-green-600 dark:text-green-400 pt-2 font-medium animate-pulse">
-              🎉 Excellent! You've met your hydration goal!
-            </div>
-          )}
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }
+
+export default WaterIntakeTracker;
