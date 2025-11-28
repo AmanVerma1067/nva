@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
@@ -18,7 +19,7 @@ type LastAction = { type: "add" | "remove" | "reset"; prevValue: number; timesta
 
 const SAVE_DEBOUNCE_MS = 900;
 const UNDO_TIMEOUT_MS = 6000;
-const STREAK_KEY = "nv_water_streak_v1"; // localStorage key for streak tracking
+const STREAK_KEY = "nv_water_streak_v1";
 
 export function WaterIntakeTracker({ userId, initialGlasses = 0, goal = 8 }: WaterIntakeProps) {
   const { toast } = useToast();
@@ -32,7 +33,6 @@ export function WaterIntakeTracker({ userId, initialGlasses = 0, goal = 8 }: Wat
   const prevValueRef = useRef<number>(initialGlasses);
   const mountedRef = useRef(false);
 
-  // Helper: persist to server (debounced)
   const scheduleSave = (value: number) => {
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
     saveTimer.current = window.setTimeout(() => {
@@ -40,7 +40,6 @@ export function WaterIntakeTracker({ userId, initialGlasses = 0, goal = 8 }: Wat
     }, SAVE_DEBOUNCE_MS) as unknown as number;
   };
 
-  // Optimistic save with rollback on error
   const persistWater = async (value: number) => {
     setSaving(true);
     try {
@@ -55,7 +54,6 @@ export function WaterIntakeTracker({ userId, initialGlasses = 0, goal = 8 }: Wat
     } catch (err) {
       console.error("Persist water failed:", err);
       setSaving(false);
-      // rollback to previous known value
       setWaterGlasses(prevValueRef.current);
       toast({
         title: "Save failed",
@@ -65,7 +63,6 @@ export function WaterIntakeTracker({ userId, initialGlasses = 0, goal = 8 }: Wat
     }
   };
 
-  // Load current water intake from server on mount
   useEffect(() => {
     mountedRef.current = true;
     const load = async () => {
@@ -83,7 +80,7 @@ export function WaterIntakeTracker({ userId, initialGlasses = 0, goal = 8 }: Wat
       }
     };
     load();
-    // restore streak
+    
     const saved = window.localStorage.getItem(STREAK_KEY);
     if (saved) {
       try {
@@ -101,7 +98,6 @@ export function WaterIntakeTracker({ userId, initialGlasses = 0, goal = 8 }: Wat
       }
     }
 
-    // keyboard shortcuts: + and - to add/remove
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "+" || e.key === "=") handleAdd();
       if (e.key === "-" || e.key === "_") handleRemove();
@@ -114,20 +110,16 @@ export function WaterIntakeTracker({ userId, initialGlasses = 0, goal = 8 }: Wat
       if (saveTimer.current) window.clearTimeout(saveTimer.current);
       if (undoTimer.current) window.clearTimeout(undoTimer.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // update streak localStorage when goal reached
   const recordStreakIfNeeded = (value: number) => {
     try {
       const today = new Date().toISOString().split("T")[0];
       const raw = window.localStorage.getItem(STREAK_KEY);
       let data = { lastDate: "", streak: 0 } as { lastDate: string; streak: number };
       if (raw) data = JSON.parse(raw);
-      // If already reached today, do nothing
       if (data.lastDate === today) return;
       if (value >= goal) {
-        // if previous day was yesterday => increment streak, else reset to 1
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
         const yesterdayStr = yesterday.toISOString().split("T")[0];
@@ -142,16 +134,13 @@ export function WaterIntakeTracker({ userId, initialGlasses = 0, goal = 8 }: Wat
         });
       }
     } catch (err) {
-      // ignore storage issues
       console.warn("streak save failed", err);
     }
   };
 
-  // UI helpers
   const percentage = Math.min((waterGlasses / goal) * 100, 100);
   const isGoalReached = waterGlasses >= goal;
 
-  // Core actions (optimistic)
   const doAction = (newValue: number, actionType: LastAction["type"]) => {
     const prev = prevValueRef.current;
     prevValueRef.current = newValue;
@@ -159,27 +148,21 @@ export function WaterIntakeTracker({ userId, initialGlasses = 0, goal = 8 }: Wat
     setIsAnimating(true);
     window.setTimeout(() => setIsAnimating(false), 700);
 
-    // store last action for undo
     const action: LastAction = { type: actionType, prevValue: prev, timestamp: Date.now() };
     setLastAction(action);
 
-    // schedule persistence
     scheduleSave(newValue);
 
-    // show undo toast
     if (undoTimer.current) window.clearTimeout(undoTimer.current);
     undoTimer.current = window.setTimeout(() => {
       setLastAction(null);
-      // record streak only after undo window passes
       recordStreakIfNeeded(newValue);
       undoTimer.current = null;
     }, UNDO_TIMEOUT_MS) as unknown as number;
 
-    // Create a React element for the toast action (Undo button)
     const undoButton = (
       <button
         onClick={() => {
-          // revert
           if (!action) return;
           if (undoTimer.current) {
             window.clearTimeout(undoTimer.current);
@@ -208,13 +191,11 @@ export function WaterIntakeTracker({ userId, initialGlasses = 0, goal = 8 }: Wat
           : actionType === "remove"
           ? `${newValue}/${goal} glasses`
           : "All water reset",
-      // pass a React element (button) as the action so toast can render it safely
       action: undoButton as unknown as React.ReactNode,
     });
   };
 
   const handleAdd = () => {
-    // limit: allow some extra above goal (goal + 6)
     const max = goal + 6;
     if (waterGlasses >= max) {
       toast({ title: "Limit reached", description: `You've reached the maximum tracked intake (${max}).` });
@@ -235,7 +216,6 @@ export function WaterIntakeTracker({ userId, initialGlasses = 0, goal = 8 }: Wat
     doAction(0, "reset");
   };
 
-  // explicit save button (if user wants to force save)
   const handleForceSave = () => {
     if (saveTimer.current) {
       window.clearTimeout(saveTimer.current);
@@ -244,47 +224,64 @@ export function WaterIntakeTracker({ userId, initialGlasses = 0, goal = 8 }: Wat
     persistWater(waterGlasses);
   };
 
-  // Small visual components
   const Bottle = ({ fill }: { fill: number }) => {
-    // fill 0..100
     const clamped = Math.max(0, Math.min(100, fill));
-    const waveY = 100 - clamped; // percent for transform
+    const waveY = 100 - clamped;
     return (
-      <div className="relative w-24 h-40 md:w-28 md:h-44 flex-shrink-0">
-        <div className="absolute inset-0 flex items-end justify-center pointer-events-none">
-          <div className="w-16 md:w-18 h-[86%] relative rounded-2xl overflow-hidden border-2 border-white/30 shadow-inner bg-white/5 dark:bg-black/20">
-            {/* animated liquid */}
-            <motion.div
-              aria-hidden
-              initial={{ y: "100%" }}
-              animate={{ y: `${waveY}%` }}
-              transition={{ ease: "easeInOut", duration: 0.8 }}
-              className={`absolute left-0 right-0 bottom-0 top-0 bg-gradient-to-t from-blue-500/90 to-blue-300/70`}
-              style={{ transformOrigin: "center bottom" }}
-            >
-              {/* bubbles */}
-              <AnimatePresence>
-                {Array.from({ length: Math.max(2, Math.floor(clamped / 20)) }).map((_, i) => (
-                  <motion.span
-                    key={i}
-                    initial={{ opacity: 0, y: 10, scale: 0.6 }}
-                    animate={{ opacity: 0.9, y: -10 - (i % 3) * 8, scale: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ repeat: Infinity, repeatType: "reverse", duration: 3 + i * 0.6, delay: i * 0.2 }}
-                    className="absolute rounded-full bg-white/60"
-                    style={{ width: 8, height: 8, bottom: `${10 + i * 6}%`, left: `${10 + i * 12}%` }}
-                  />
-                ))}
-              </AnimatePresence>
-            </motion.div>
-          </div>
+      <div className="relative w-28 h-48 flex-shrink-0 flex flex-col items-center">
+        <div className="w-20 h-36 relative rounded-2xl overflow-hidden border-2 border-blue-200 dark:border-blue-700 shadow-lg bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+          {/* Animated liquid with smoother transition */}
+          <motion.div
+            aria-hidden
+            initial={false}
+            animate={{ y: `${waveY}%` }}
+            transition={{ 
+              type: "spring",
+              stiffness: 100,
+              damping: 20,
+              mass: 0.8
+            }}
+            className="absolute left-0 right-0 bottom-0 top-0 bg-gradient-to-t from-blue-500 via-blue-400 to-blue-300"
+            style={{ transformOrigin: "center bottom" }}
+          >
+            {/* Smoother bubbles animation */}
+            <AnimatePresence>
+              {Array.from({ length: Math.max(3, Math.floor(clamped / 15)) }).map((_, i) => (
+                <motion.span
+                  key={i}
+                  initial={{ opacity: 0, y: 0, scale: 0 }}
+                  animate={{ 
+                    opacity: [0, 0.8, 0],
+                    y: [-20, -60],
+                    scale: [0.6, 1, 0.8]
+                  }}
+                  transition={{ 
+                    repeat: Infinity,
+                    duration: 2.5 + i * 0.4,
+                    delay: i * 0.3,
+                    ease: "easeInOut"
+                  }}
+                  className="absolute rounded-full bg-white/70"
+                  style={{ 
+                    width: 6 + (i % 2) * 2, 
+                    height: 6 + (i % 2) * 2, 
+                    bottom: `${5 + (i % 3) * 3}%`, 
+                    left: `${15 + i * 15}%` 
+                  }}
+                />
+              ))}
+            </AnimatePresence>
+          </motion.div>
         </div>
-        {/* Bottle outline / label */}
-        <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 text-xs text-muted-foreground w-full text-center">
-          <div className="text-[11px]">
-            {waterGlasses}/{goal} glasses
+        
+        {/* Fixed text overflow issue with better spacing and truncation */}
+        <div className="mt-3 text-center w-full px-2">
+          <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+            {waterGlasses}/{goal}
           </div>
-          <div className="text-[10px] text-gray-400">Goal: {goal}</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+            Goal: {goal} glasses
+          </div>
         </div>
       </div>
     );
@@ -292,14 +289,19 @@ export function WaterIntakeTracker({ userId, initialGlasses = 0, goal = 8 }: Wat
 
   return (
     <Card
-      className={`relative overflow-hidden transition-shadow duration-300 rounded-2xl ${
-        isGoalReached ? "ring-2 ring-green-300/60" : "ring-0"
+      className={`relative overflow-hidden transition-all duration-500 rounded-2xl ${
+        isGoalReached ? "ring-2 ring-green-400/60 shadow-lg shadow-green-100/50" : "ring-0"
       }`}
     >
-      <CardHeader className="flex items-center justify-between pb-2">
+      <CardHeader className="flex items-center justify-between pb-3">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <Droplet className={`h-5 w-5 ${isGoalReached ? "text-green-600" : "text-blue-600"}`} />
+            <motion.div
+              animate={isAnimating ? { scale: [1, 1.2, 1], rotate: [0, -10, 10, 0] } : {}}
+              transition={{ duration: 0.5 }}
+            >
+              <Droplet className={`h-5 w-5 ${isGoalReached ? "text-green-600" : "text-blue-600"}`} />
+            </motion.div>
             <CardTitle className="text-sm font-semibold">Water Intake</CardTitle>
           </div>
           <div className="ml-2 text-xs text-muted-foreground hidden md:block">Stay hydrated — small steps matter</div>
@@ -308,7 +310,7 @@ export function WaterIntakeTracker({ userId, initialGlasses = 0, goal = 8 }: Wat
         <div className="flex items-center gap-2">
           <div className="text-xs text-muted-foreground text-right">
             <div className="font-semibold">{Math.round(percentage)}%</div>
-            <div className="text-[11px] text-gray-400">{streakDays ? `Streak: ${streakDays}d` : "No streak"}</div>
+            <div className="text-[11px] text-gray-400">{streakDays ? `🔥 ${streakDays}d` : "No streak"}</div>
           </div>
         </div>
       </CardHeader>
@@ -326,69 +328,55 @@ export function WaterIntakeTracker({ userId, initialGlasses = 0, goal = 8 }: Wat
               <Progress value={percentage} className="h-3 rounded-full" />
               <div className="flex justify-between text-xs text-muted-foreground mt-2">
                 <span>{waterGlasses} glasses</span>
-                <span>{Math.round(percentage)}% of {goal}</span>
+                <span>{Math.round(percentage)}%</span>
               </div>
             </div>
 
-            {/* BUTTONS: fixed outer box, animate inner icon only (no layout shift) */}
-            <div className="flex flex-col items-center gap-2 overflow-hidden">
-              {/* Add */}
-              <button
+            {/* Smoother button animations */}
+            <div className="flex flex-col items-center gap-2">
+              <motion.button
                 onClick={handleAdd}
                 aria-label="Add glass"
                 title="Add glass"
-                className="flex-shrink-0 transform-gpu will-change-transform inline-flex items-center justify-center rounded-full bg-blue-600 hover:bg-blue-700 text-white w-10 h-10 shadow"
-                style={{ position: "relative", overflow: "hidden" }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                className="flex-shrink-0 inline-flex items-center justify-center rounded-full bg-blue-600 hover:bg-blue-700 text-white w-10 h-10 shadow-md hover:shadow-lg transition-shadow"
               >
-                <motion.span
-                  initial={{ scale: 1 }}
-                  whileTap={{ scale: 0.9 }}
-                  transition={{ type: "spring", stiffness: 700, damping: 30 }}
-                  className="inline-flex items-center justify-center"
-                  style={{ display: "inline-flex" }}
-                >
-                  <Plus className="h-4 w-4" />
-                </motion.span>
-              </button>
+                <Plus className="h-4 w-4" />
+              </motion.button>
 
-              {/* Remove */}
-              <button
+              <motion.button
                 onClick={handleRemove}
                 aria-label="Remove glass"
                 title="Remove glass"
-                className="flex-shrink-0 transform-gpu will-change-transform inline-flex items-center justify-center rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 w-10 h-10 shadow-sm"
-                style={{ position: "relative", overflow: "hidden" }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                className="flex-shrink-0 inline-flex items-center justify-center rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 w-10 h-10 shadow-sm hover:shadow-md transition-shadow"
               >
-                <motion.span
-                  initial={{ scale: 1 }}
-                  whileTap={{ scale: 0.9 }}
-                  transition={{ type: "spring", stiffness: 700, damping: 30 }}
-                  className="inline-flex items-center justify-center"
-                  style={{ display: "inline-flex" }}
-                >
-                  <Minus className="h-4 w-4 text-gray-700" />
-                </motion.span>
-              </button>
+                <Minus className="h-4 w-4 text-gray-700 dark:text-gray-300" />
+              </motion.button>
             </div>
           </div>
 
-          <div className="flex gap-2 items-center">
-            <Button variant="ghost" onClick={handleReset} className="flex items-center gap-2">
+          <div className="flex gap-2 items-center flex-wrap">
+            <Button variant="ghost" onClick={handleReset} className="flex items-center gap-2 text-sm">
               <RotateCcw className="h-4 w-4" /> Reset
             </Button>
 
-            <Button variant="outline" onClick={handleForceSave} className="flex items-center gap-2">
+            <Button variant="outline" onClick={handleForceSave} className="flex items-center gap-2 text-sm" disabled={saving}>
               {saving ? "Saving..." : "Save Now"}
             </Button>
 
             <AnimatePresence>
               {lastAction && (
                 <motion.button
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 6 }}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
                   onClick={() => {
-                    // manual undo via small button
                     setWaterGlasses(lastAction.prevValue);
                     prevValueRef.current = lastAction.prevValue;
                     scheduleSave(lastAction.prevValue);
@@ -399,7 +387,7 @@ export function WaterIntakeTracker({ userId, initialGlasses = 0, goal = 8 }: Wat
                       undoTimer.current = null;
                     }
                   }}
-                  className="ml-auto text-white bg-black border-white inline-flex items-center gap-2 rounded-lg px-3 py-1 bg-gray-100 hover:bg-gray-200 text-sm"
+                  className="ml-auto inline-flex items-center gap-2 rounded-lg px-3 py-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-sm font-medium transition-colors"
                 >
                   <Undo className="h-4 w-4" /> Undo
                 </motion.button>
@@ -407,16 +395,16 @@ export function WaterIntakeTracker({ userId, initialGlasses = 0, goal = 8 }: Wat
             </AnimatePresence>
           </div>
 
-          {/* Motivational / contextual message */}
-          <div className="mt-4 text-sm">
+          {/* Motivational message with smoother transitions */}
+          <div className="mt-4">
             <AnimatePresence mode="wait">
               <motion.div
                 key={Math.min(waterGlasses, goal)}
-                initial={{ opacity: 0, y: 6 }}
+                initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
-                transition={{ duration: 0.28 }}
-                className={`text-xs ${isGoalReached ? "text-green-700 font-medium" : "text-gray-600"}`}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.3, ease: "easeInOut" }}
+                className={`text-xs ${isGoalReached ? "text-green-700 dark:text-green-400 font-medium" : "text-gray-600 dark:text-gray-400"}`}
               >
                 {isGoalReached
                   ? "🎉 Goal hit — excellent hydration!"
