@@ -3,130 +3,189 @@
 import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { ChefHat, Plus } from "lucide-react";
+import { Plus, ChefHat } from "lucide-react";
 
-/**
- * MealSuggestions component with "Generate Meal Plan" functionality.
- * - Calls /api/generate-mealplan (server route)
- * - Expects provider response with a meal plan & macros (adapts both JSON or textual responses)
- */
+// This component uses hardcoded meal plans and cycles through a different
+// plan on each click. No API calls, no testing outputs.
+
+const HARDCODED_PLANS = [
+  {
+    id: 1,
+    daily_calorie_target: 2200,
+    meal_plan: {
+      Breakfast: [
+        { name: "Oats with banana & almonds", calories: 350 },
+        { name: "Green tea", calories: 0 }
+      ],
+      Lunch: [
+        { name: "Paneer tikka wrap", calories: 650 },
+        { name: "Mixed salad", calories: 120 }
+      ],
+      Dinner: [
+        { name: "Dal + Brown rice", calories: 600 },
+        { name: "Steamed veggies", calories: 100 }
+      ],
+      Snack: [
+        { name: "Greek yogurt with honey", calories: 180 }
+      ]
+    }
+  },
+
+  {
+    id: 2,
+    daily_calorie_target: 1800,
+    meal_plan: {
+      Breakfast: [
+        { name: "Poha with peanuts", calories: 300 }
+      ],
+      Lunch: [
+        { name: "Chickpea salad bowl", calories: 500 }
+      ],
+      Dinner: [
+        { name: "Grilled tofu + quinoa", calories: 700 }
+      ],
+      Snack: [
+        { name: "Apple with peanut butter", calories: 150 }
+      ]
+    }
+  },
+
+  {
+    id: 3,
+    daily_calorie_target: 2500,
+    meal_plan: {
+      Breakfast: [
+        { name: "Stuffed paratha + curd", calories: 600 }
+      ],
+      Lunch: [
+        { name: "Chicken biryani (small)", calories: 900 }
+      ],
+      Dinner: [
+        { name: "Fish curry + roti", calories: 700 }
+      ],
+      Snack: [
+        { name: "Masala peanuts", calories: 200 }
+      ]
+    }
+  },
+
+  {
+    id: 4,
+    daily_calorie_target: 2000,
+    meal_plan: {
+      Breakfast: [
+        { name: "Smoothie (banana+spinach+protein)", calories: 350 }
+      ],
+      Lunch: [
+        { name: "Veggie quinoa bowl", calories: 600 }
+      ],
+      Dinner: [
+        { name: "Lentil soup + toast", calories: 600 }
+      ],
+      Snack: [
+        { name: "Carrot sticks + hummus", calories: 150 }
+      ]
+    }
+  },
+
+  {
+    id: 5,
+    daily_calorie_target: 1600,
+    meal_plan: {
+      Breakfast: [
+        { name: "Upma with veggies", calories: 280 }
+      ],
+      Lunch: [
+        { name: "Rajma + rice (small)", calories: 550 }
+      ],
+      Dinner: [
+        { name: "Mixed veg stir-fry + noodles", calories: 600 }
+      ],
+      Snack: [
+        { name: "Roasted chana", calories: 170 }
+      ]
+    }
+  },
+
+  {
+    id: 6,
+    daily_calorie_target: 2100,
+    meal_plan: {
+      Breakfast: [
+        { name: "Idli (3) + sambar", calories: 320 }
+      ],
+      Lunch: [
+        { name: "Grilled chicken salad", calories: 600 }
+      ],
+      Dinner: [
+        { name: "Methi paratha + curd", calories: 700 }
+      ],
+      Snack: [
+        { name: "Fruit bowl", calories: 180 }
+      ]
+    }
+  },
+
+  {
+    id: 7,
+    daily_calorie_target: 2300,
+    meal_plan: {
+      Breakfast: [
+        { name: "Masala oats", calories: 350 }
+      ],
+      Lunch: [
+        { name: "Soya keema + roti", calories: 750 }
+      ],
+      Dinner: [
+        { name: "Paneer butter masala + rice", calories: 800 }
+      ],
+      Snack: [
+        { name: "Protein shake", calories: 200 }
+      ]
+    }
+  },
+
+  {
+    id: 8,
+    daily_calorie_target: 1900,
+    meal_plan: {
+      Breakfast: [
+        { name: "Multigrain toast + avocado", calories: 320 }
+      ],
+      Lunch: [
+        { name: "Lentil salad + seeds", calories: 550 }
+      ],
+      Dinner: [
+        { name: "Vegetable korma + chapati", calories: 700 }
+      ],
+      Snack: [
+        { name: "Mixed nuts (small)", calories: 180 }
+      ]
+    }
+  }
+];
 
 export default function MealSuggestions({ suggestions: _suggestions }: { suggestions?: any[] }) {
   const suggestions = _suggestions ?? [];
 
+  // index of currently displayed hardcoded plan
+  const [index, setIndex] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [statusCode, setStatusCode] = useState<number | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [rawProvider, setRawProvider] = useState<any | null>(null);
+  const [shown, setShown] = useState(false);
 
-  // Example test_user payload you provided
-  const test_user = {
-    age: 25,
-    gender: "male",
-    height_cm: 180,
-    weight_kg: 75,
-    activity_level: 3,
-    goal: "maintain",
-    diet_type: "vegetarian",
-  };
-
-  async function handleGenerate(userPayload = test_user) {
+  function showNextPlan() {
     setLoading(true);
-    setStatusCode(null);
-    setMessage(null);
-    setRawProvider(null);
+    setShown(false);
 
-    try {
-      const res = await fetch("/api/generate-mealplan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          user: userPayload,
-          // optional instructions for provider; you can adjust prompts here
-          instructions: "Return a daily meal plan (Breakfast, Lunch, Dinner, Snack) with kcal per item and macronutrient recommendations."
-        }),
-      });
-
-      const json = await res.json();
-      setStatusCode(json?.status ?? res.status);
-
-      // Provider returned parsed JSON inside providerResponse -> try to format it
-      const providerResponse = json?.providerResponse ?? json?.providerResponseText ?? json;
-
-      // If providerResponse is text, keep it as-is
-      if (typeof providerResponse === "string") {
-        setMessage(providerResponse);
-        setRawProvider(providerResponse);
-      } else if (providerResponse && typeof providerResponse === "object") {
-        // Try to extract fields commonly returned by nutrition endpoints
-        // adapt field names as per your provider's response shape
-        if (providerResponse.meal_plan || providerResponse.plan || providerResponse.meals) {
-          // structured plan
-          const plan = providerResponse.meal_plan ?? providerResponse.plan ?? providerResponse.meals;
-          const target = providerResponse.daily_calorie_target ?? providerResponse.target_calories ?? providerResponse.dailyCalories;
-          const macros = providerResponse.macros ?? providerResponse.recommendations ?? providerResponse.macroRecommendations;
-
-          // build readable text message similar to your sample
-          let out = `✅ Meal plan generated successfully!\n`;
-          if (target) out += `🎯 Daily Calorie Target: ${target} kcal\n\n`;
-          out += `📋 Meal Plan:\n`;
-          // assume plan is object with meals grouped by meal name
-          if (Array.isArray(plan)) {
-            // array of meals — group by meal.time or meal.mealType if available
-            plan.forEach((m: any) => {
-              out += `  - ${m.name} : ${m.calories ?? m.kcal ?? "—"} kcal\n`;
-            });
-          } else {
-            // object grouping like { Breakfast: [...], Lunch: [...] }
-            for (const [mealType, items] of Object.entries(plan)) {
-              out += `  ${mealType}:\n`;
-              if (Array.isArray(items)) {
-                items.forEach((it: any) => {
-                  const name = it.name ?? it.item ?? it.title ?? JSON.stringify(it);
-                  const kcal = it.calories ?? it.kcal ?? it.kcal_estimate ?? "—";
-                  out += `    - ${name}: ${kcal} kcal\n`;
-                });
-              } else {
-                out += `    ${JSON.stringify(items)}\n`;
-              }
-            }
-          }
-
-          out += `\n📊 Testing nutrition recommendations endpoint...\nStatus Code: ${json?.status ?? res.status}\n`;
-          out += `✅ Nutrition recommendations generated successfully!\n`;
-          if (macros) {
-            out += `🎯 Daily Calorie Target: ${macros?.calories ?? target ?? "—"} kcal\n\n`;
-            out += `🥗 Macronutrient Recommendations:\n`;
-            out += `  - Protein: ${macros?.protein ?? macros?.protein_g ?? macros?.protein_g_per_day ?? "—"}g\n`;
-            out += `  - Carbohydrates: ${macros?.carbs ?? macros?.carbohydrates ?? macros?.carb_g ?? "—"}g\n`;
-            out += `  - Fat: ${macros?.fat ?? macros?.lipid_g ?? "—"}g\n`;
-          }
-
-          setMessage(out);
-          setRawProvider(providerResponse);
-        } else {
-          // Generic JSON — show pretty JSON
-          setMessage(JSON.stringify(providerResponse, null, 2));
-          setRawProvider(providerResponse);
-        }
-      } else {
-        setMessage("No response content from provider.");
-      }
-    } catch (err: any) {
-      console.error("Generate error:", err);
-      setMessage(`Error: ${err?.message ?? "Unknown error"}`);
-    } finally {
+    // simulate loading/animation before showing the plan
+    setTimeout(() => {
+      setIndex((prev) => (prev + 1) % HARDCODED_PLANS.length);
       setLoading(false);
-    }
+      setShown(true);
+    }, 650);
   }
 
-  const handleCopy = async () => {
-    if (!message) return;
-    await navigator.clipboard.writeText(message);
-    // small UX feedback — you can connect to your toast
-    alert("Copied to clipboard");
-  };
+  const activePlan = HARDCODED_PLANS[index];
 
   return (
     <Card className="border-2 border-medical-blue/20">
@@ -135,54 +194,67 @@ export default function MealSuggestions({ suggestions: _suggestions }: { suggest
           <ChefHat className="h-5 w-5 text-medical-blue" />
           <span>Meal Suggestions</span>
         </CardTitle>
-        <CardDescription>Based on your health goals and dietary needs</CardDescription>
+        <CardDescription>Click the button to reveal a preset meal plan.</CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-4">
-        {/* existing suggestions */}
-        {suggestions.length > 0 && suggestions.map((meal) => (
-          <div key={meal.id ?? meal.name} className="p-4 border rounded-lg">
-            <div className="flex items-start justify-between gap-4 mb-3">
-              <div>
-                <h4 className="font-medium">{meal.name}</h4>
-                <p className="text-xs mt-1">{meal.reason}</p>
+        {suggestions.length > 0 &&
+          suggestions.map((meal) => (
+            <div key={meal.id ?? meal.name} className="p-4 border rounded-lg">
+              <div className="flex items-start justify-between gap-4 mb-3">
+                <div>
+                  <h4 className="font-medium">{meal.name}</h4>
+                  <p className="text-xs mt-1">{meal.reason}</p>
+                </div>
+
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => window.dispatchEvent(new CustomEvent("quickAddMeal", { detail: { meal } }))}
+                  aria-label={`Quick add ${meal.name}`}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
               </div>
-
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => window.dispatchEvent(new CustomEvent("quickAddMeal", { detail: { meal } }))}
-                aria-label={`Quick add ${meal.name}`}
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
             </div>
-          </div>
-        ))}
+          ))}
 
-        {/* controls */}
-        <div className="flex gap-2">
-          <Button className="bg-medical-blue" onClick={() => handleGenerate(test_user)} disabled={loading}>
-            {loading ? "Generating…" : "Generate Meal Plan"}
+        <div className="flex gap-2 items-center">
+          <Button className="bg-medical-blue" onClick={showNextPlan} disabled={loading}>
+            Show meal option
           </Button>
-          <Button variant="outline" onClick={() => handleGenerate(test_user)} disabled={loading}>
-            Test (use example user)
-          </Button>
-          <Button variant="ghost" onClick={handleCopy} disabled={!message}>
-            Copy Result
-          </Button>
+
+          {/* simple loader */}
+          {loading && (
+            <div className="flex items-center">
+              <div className="w-6 h-6 border-4 border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
         </div>
 
-        {/* status / result */}
-        <div className="mt-4">
-          {statusCode !== null && <div className="text-sm text-gray-500">Status Code: {statusCode}</div>}
-          {message && (
-            <pre className="mt-2 p-3 bg-gray-50 dark:bg-gray-900/40 rounded text-sm whitespace-pre-wrap">
-              {message}
-            </pre>
-          )}
-          {!message && !loading && (
-            <div className="text-sm text-gray-500">No generated plan yet. Click &quot;Generate Meal Plan&quot; to start.</div>
+        {/* DISPLAY ONLY AFTER CLICK - with fade animation */}
+        <div className={`mt-4 space-y-2 ${shown ? 'opacity-100 transition-opacity duration-500' : 'opacity-0'}`}>
+          {shown && (
+            <>
+              <h3 className="font-semibold">Daily Calorie Target:</h3>
+              <p className="text-medical-blue font-medium">{activePlan.daily_calorie_target} kcal</p>
+
+              <h3 className="font-semibold mt-4">Meal Plan:</h3>
+              <div className="space-y-3">
+                {Object.entries(activePlan.meal_plan).map(([mealType, foods]) => (
+                  <div key={mealType}>
+                    <h4 className="font-medium text-gray-700">{mealType}</h4>
+                    <ul className="ml-4 list-disc text-sm">
+                      {(foods as any[]).map((f, idx) => (
+                        <li key={idx}>
+                          {f.name} — {f.calories} kcal
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </div>
       </CardContent>
