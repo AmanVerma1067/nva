@@ -28,7 +28,8 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { FoodInputTabs } from "@/components/food-input-tabs";
-import { NutritionChart } from "@/components/nutrition-chart";
+import NutritionChart from "@/components/nutrition-chart"
+
 import { useToast } from "@/hooks/use-toast";
 
 // static imports for the components you added
@@ -438,12 +439,12 @@ export function MainDashboard() {
             </div>
             <h4 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Generate Your Daily Report</h4>
             <p className="text-gray-500 max-w-md mb-6">
-              Analyze your current food logs, water intake, and nutritional goals to get personalized AI recommendations using Gemini.
+              Analyze your current food logs, water intake, and nutritional goals to get personalized AI recommendations.
             </p>
             <Button size="lg" onClick={handleGenerateInsights} disabled={isGenerating || foodLogs.length === 0} className="bg-purple-600 hover:bg-purple-700 text-white">
               {isGenerating ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Analyzing with Gemini...
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Analyzing with...
                 </>
               ) : (
                 <>
@@ -507,7 +508,7 @@ export function MainDashboard() {
                 {/* Recommendations */}
                 <div>
                   <h4 className="flex items-center gap-2 font-semibold text-gray-900 dark:text-white mb-4">
-                    <CheckCircle2 className="h-4 w-4 text-green-500" /> Gemini's Recommendations
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />Recommendations
                   </h4>
                   <div className="space-y-3">
                     {insights.recommendations.map((item, idx) => (
